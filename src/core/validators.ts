@@ -30,7 +30,6 @@ export function isRuling(value: unknown): value is Ruling {
 
 /** Determine whether a value is an exact {@link QualificationDefinition} record. */
 export function isQualificationDefinition(value: unknown): value is QualificationDefinition {
-	if (!isRecord(value)) return false
 	return recordOf(
 		{
 			id: isString,

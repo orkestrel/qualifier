@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
 	createQualifier,
+	isQualifierError,
+	QualifierError,
 	qualificationDefinition,
 	QUALIFICATION_KEY,
 	rulingDefinition,
 } from '@src/core'
 import {
 	atom,
+	createEvaluator,
 	createLogicalReasoner,
 	createQuantitativeReasoner,
 	createReason,
@@ -21,10 +24,12 @@ import {
 import {
 	buildCapExcessGatesDefinition,
 	buildConditionDefinition,
+	buildContinuingLogicalDefinition,
 	buildEvidenceSnapshotDefinition,
 	buildGatesDefinition,
 	buildReferralDefinition,
 	buildScopedWindDefinition,
+	createFailingEngine,
 	createRecorder,
 } from '../../setup'
 
@@ -541,6 +546,213 @@ describe('Qualifier', () => {
 				'finding',
 				'qualify',
 			])
+		})
+	})
+
+	describe('reentry', () => {
+		it('throws DESTROYED when a derive listener destroys the qualifier mid-run', () => {
+			const qualifier: ReturnType<typeof createQualifier> = createQualifier({
+				on: {
+					derive: () => qualifier?.destroy(),
+				},
+			})
+			const definition = buildCapExcessGatesDefinition()
+
+			expect(() => qualifier?.qualify({ id: 'risk-1', total: 1 }, definition)).toThrow(
+				expect.objectContaining({ code: 'DESTROYED', name: 'QualifierError' }),
+			)
+		})
+
+		it('throws DESTROYED when a finding listener destroys the qualifier mid-run', () => {
+			const qualifier: ReturnType<typeof createQualifier> = createQualifier({
+				on: {
+					finding: () => qualifier?.destroy(),
+				},
+			})
+			const definition = buildContinuingLogicalDefinition()
+
+			expect(() => qualifier?.qualify({ id: 'risk-1', flag: true }, definition)).toThrow(
+				expect.objectContaining({ code: 'DESTROYED', name: 'QualifierError' }),
+			)
+		})
+	})
+
+	describe('errors', () => {
+		it('maps a missing-reasoner engine throw to ENGINE', () => {
+			const engine = createReason({
+				reasoners: [createQuantitativeReasoner({ evaluator: createEvaluator() })],
+				bail: false,
+			})
+			const qualifier = createQualifier({ engine })
+			const gates = logicalDefinition('gates', 'Gates', [
+				rule('flag', [atom('flag', 'equals', true)], atom('noted', 'equals', true)),
+			])
+			const definition = qualificationDefinition('bad', 'Bad', [gates])
+
+			expect(() => qualifier.qualify({ id: 'x', flag: true }, definition)).toThrow(
+				expect.objectContaining({ code: 'ENGINE', name: 'QualifierError' }),
+			)
+
+			engine.destroy()
+		})
+
+		it('maps an already-destroyed injected engine to DESTROYED', () => {
+			const engine = createReason({
+				reasoners: [createQuantitativeReasoner(), createLogicalReasoner()],
+				bail: false,
+			})
+			engine.destroy()
+			const qualifier = createQualifier({ engine })
+
+			expect(() => qualifier.qualify({ id: 'x' }, buildGatesDefinition())).toThrow(
+				expect.objectContaining({ code: 'DESTROYED', name: 'QualifierError' }),
+			)
+		})
+	})
+
+	describe('fail-closed on operational failure', () => {
+		it('stops after the first pass, prefixes trace/errors with the pass id, and reports referral', () => {
+			const cap = quantitativeDefinition('cap', 'Cap', [
+				factorGroup('limit', 'sum', [staticFactor('base', 1)]),
+			])
+			const excess = quantitativeDefinition('excess', 'Excess', [
+				factorGroup('excess', 'sum', [staticFactor('base', 1)]),
+			])
+			const definition = qualificationDefinition('property', 'Property', [cap, excess])
+			const qualifier = createQualifier({ engine: createFailingEngine() })
+
+			const result = qualifier.qualify({ id: 'risk-1' }, definition)
+
+			expect(result.success).toBe(false)
+			expect(result.eligibility).toBe('referral')
+			expect(result.trace).toEqual(['cap: engine trace'])
+			expect(result.errors).toEqual(['cap: engine boom'])
+			expect(result.derivations).toHaveLength(1)
+			expect(result.derivations[0]?.id).toBe('cap')
+
+			qualifier.destroy()
+		})
+	})
+
+	describe('validate — id/name/warnings channel', () => {
+		it('reports an empty id', () => {
+			const qualifier = createQualifier()
+			const definition = qualificationDefinition('', 'Standard', [])
+
+			expect(qualifier.validate(definition).valid).toBe(false)
+			expect(qualifier.validate(definition).errors).toContain('Definition id must not be empty')
+
+			qualifier.destroy()
+		})
+
+		it('reports an empty name', () => {
+			const qualifier = createQualifier()
+			const definition = qualificationDefinition('standard', '', [])
+
+			expect(qualifier.validate(definition).errors).toContain('Definition name must not be empty')
+
+			qualifier.destroy()
+		})
+
+		it('reports valid with no errors or warnings for a well-formed definition', () => {
+			const qualifier = createQualifier()
+			const validation = qualifier.validate(buildGatesDefinition())
+
+			expect(validation).toEqual({ valid: true, errors: [], warnings: [] })
+
+			qualifier.destroy()
+		})
+	})
+
+	describe('validate — empty passes fail-open', () => {
+		it('is valid with a no-passes warning, and qualifies as eligible', () => {
+			const qualifier = createQualifier()
+			const definition = qualificationDefinition('empty', 'Empty', [])
+
+			expect(qualifier.validate(definition)).toEqual({
+				valid: true,
+				errors: [],
+				warnings: ['Definition has no passes'],
+			})
+
+			const result = qualifier.qualify({ id: 'risk-1' }, definition)
+			expect(result.eligibility).toBe('eligible')
+			expect(result.findings).toEqual([])
+			expect(result.derivations).toEqual([])
+
+			qualifier.destroy()
+		})
+	})
+
+	describe('validate — new warnings', () => {
+		it('warns on a logical pass with no rulings', () => {
+			const qualifier = createQualifier()
+			const gates = logicalDefinition('gates', 'Gates', [
+				rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+			])
+			const definition = qualificationDefinition('standard', 'Standard', [gates])
+
+			const validation = qualifier.validate(definition)
+			expect(validation.valid).toBe(true)
+			expect(validation.warnings).toContain("Logical pass 'gates' has no rulings")
+
+			qualifier.destroy()
+		})
+
+		it('warns on a quantitative pass never read by a later pass', () => {
+			const qualifier = createQualifier()
+			const cap = quantitativeDefinition('cap', 'Cap', [
+				factorGroup('limit', 'sum', [staticFactor('base', 1)]),
+			])
+			const definition = qualificationDefinition('standard', 'Standard', [cap])
+
+			const validation = qualifier.validate(definition)
+			expect(validation.valid).toBe(true)
+			expect(validation.warnings).toContain("Quantitative pass 'cap' is never read by a later pass")
+
+			qualifier.destroy()
+		})
+	})
+
+	describe('immutability', () => {
+		it('freezes the result and its arrays', () => {
+			const qualifier = createQualifier()
+			const result = qualifier.qualify({ id: 'risk-1' }, buildGatesDefinition())
+
+			expect(Object.isFrozen(result)).toBe(true)
+			expect(Object.isFrozen(result.findings)).toBe(true)
+			expect(Object.isFrozen(result.derivations)).toBe(true)
+			expect(Object.isFrozen(result.scopes)).toBe(true)
+			expect(Object.isFrozen(result.trace)).toBe(true)
+			expect(Object.isFrozen(result.errors)).toBe(true)
+
+			const findings: unknown = result.findings
+			expect(() => {
+				if (Array.isArray(findings)) findings.push({})
+			}).toThrow(TypeError)
+
+			qualifier.destroy()
+		})
+	})
+
+	describe('isQualifierError guard', () => {
+		it('narrows QualifierError and rejects everything else', () => {
+			expect(isQualifierError(new QualifierError('MISMATCH', 'm'))).toBe(true)
+			expect(isQualifierError(new QualifierError('ENGINE', 'e'))).toBe(true)
+			expect(isQualifierError(new Error('x'))).toBe(false)
+			expect(isQualifierError(null)).toBe(false)
+		})
+	})
+
+	describe('destroy emits exactly once', () => {
+		it('fires the destroy event exactly once across repeated calls', () => {
+			const destroyed = createRecorder<readonly []>()
+			const qualifier = createQualifier({ on: { destroy: () => destroyed.handler() } })
+
+			qualifier.destroy()
+			qualifier.destroy()
+
+			expect(destroyed.count).toBe(1)
 		})
 	})
 })

@@ -10,32 +10,36 @@ import type {
 	QualifierOptions,
 } from './types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import type { EvaluatorInterface, ReasonInterface, Subject } from '@orkestrel/reason'
+import type { EvaluatorInterface, ReasonInterface, ReasonResult, Subject } from '@orkestrel/reason'
 import { DEFAULT_QUALIFIER_VALIDATE } from './constants.js'
 import { QualifierError } from './errors.js'
 import {
 	assertSubject,
 	deriveFindingEligibility,
 	deriveScopeEligibilities,
-	findDuplicateIds,
+	findEmptyLogicalPasses,
 	findMissingReferences,
+	findUnreadDerivations,
+	mapEngineError,
 	mergeQualificationContext,
 	qualificationToRecord,
 	quantitativeResultToDerivation,
 	reasonResultToProjection,
 	rulingToFinding,
 } from './helpers.js'
+import { isQualificationPass, isRuling } from './validators.js'
 import { Emitter } from '@orkestrel/emitter'
 import {
 	createEvaluator,
 	createLogicalReasoner,
 	createQuantitativeReasoner,
 	createReason,
+	findDuplicates,
 } from '@orkestrel/reason'
 
 /**
  * A qualifier — runs ordered passes over one reason engine and returns
- * pre-rating eligibility.
+ * eligibility.
  *
  * @remarks
  * The engine is OWNED when self-created (destroyed on `destroy()`) and borrowed
@@ -94,14 +98,22 @@ export class Qualifier implements QualifierInterface {
 		const warnings: string[] = []
 		if (definition.id.length === 0) errors.push('Definition id must not be empty')
 		if (definition.name.length === 0) errors.push('Definition name must not be empty')
-		if (definition.passes.length === 0) warnings.push('Definition has no passes')
-		for (const id of findDuplicateIds(definition.passes.map((pass) => pass.id))) {
-			errors.push(`Duplicate pass id '${id}'`)
-		}
-		for (const id of findDuplicateIds((definition.rulings ?? []).map((ruling) => ruling.id))) {
+		definition.passes.forEach((pass, index) => {
+			if (!isQualificationPass(pass)) {
+				errors.push(`Pass at index ${index} is not a valid qualification pass`)
+			}
+		})
+		;(definition.rulings ?? []).forEach((ruling, index) => {
+			if (!isRuling(ruling)) errors.push(`Ruling at index ${index} is not a valid ruling`)
+		})
+		for (const id of findDuplicates(definition.passes)) errors.push(`Duplicate pass id '${id}'`)
+		for (const id of findDuplicates(definition.rulings ?? [])) {
 			errors.push(`Duplicate ruling id '${id}'`)
 		}
 		for (const reference of findMissingReferences(definition)) errors.push(reference)
+		if (definition.passes.length === 0) warnings.push('Definition has no passes')
+		for (const warning of findEmptyLogicalPasses(definition)) warnings.push(warning)
+		for (const warning of findUnreadDerivations(definition)) warnings.push(warning)
 		return { valid: errors.length === 0, errors, warnings }
 	}
 
@@ -124,8 +136,14 @@ export class Qualifier implements QualifierInterface {
 		let failed = false
 
 		for (const pass of definition.passes) {
+			this.#alive()
 			const evaluated = working
-			const result = this.#engine.reason(evaluated, pass)
+			let result: ReasonResult
+			try {
+				result = this.#engine.reason(evaluated, pass)
+			} catch (error) {
+				throw mapEngineError(error, pass.id)
+			}
 
 			trace.push(...result.trace.map((entry) => `${pass.id}: ${entry}`))
 			errors.push(...result.errors.map((entry) => `${pass.id}: ${entry}`))
@@ -164,17 +182,18 @@ export class Qualifier implements QualifierInterface {
 		}
 
 		const success = !failed && errors.length === 0
-		const qualification: QualificationResult = {
+		const scopes = deriveScopeEligibilities(findings)
+		const qualification: QualificationResult = Object.freeze({
 			id: definition.id,
 			name: definition.name,
 			eligibility: deriveFindingEligibility(findings, !success),
-			scopes: deriveScopeEligibilities(findings),
-			findings,
-			derivations,
+			scopes: Object.freeze(scopes),
+			findings: Object.freeze(findings),
+			derivations: Object.freeze(derivations),
 			success,
-			trace,
-			errors,
-		}
+			trace: Object.freeze(trace),
+			errors: Object.freeze(errors),
+		})
 		this.#emitter.emit('qualify', qualification)
 		return qualification
 	}

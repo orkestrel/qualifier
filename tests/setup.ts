@@ -1,5 +1,14 @@
 import type { QualificationDefinition } from '@src/core'
+import type {
+	Definition,
+	QuantitativeResult,
+	ReasonEventMap,
+	ReasonInterface,
+	ReasonResult,
+	Subject,
+} from '@orkestrel/reason'
 import { qualificationDefinition, rulingDefinition } from '@src/core'
+import { Emitter } from '@orkestrel/emitter'
 import {
 	atom,
 	factorGroup,
@@ -134,7 +143,7 @@ export function buildScopedWindDefinition(): QualificationDefinition {
 	})
 }
 
-/** Scoped condition ruling that keeps the scope rateable. */
+/** Scoped condition ruling that keeps the scope eligible. */
 export function buildConditionDefinition(): QualificationDefinition {
 	const gates = logicalDefinition('gates', 'Eligibility gates', [
 		rule('vacant', [atom('vacant', 'equals', true)], atom('noted', 'equals', true)),
@@ -168,4 +177,51 @@ export function buildEvidenceSnapshotDefinition(): QualificationDefinition {
 			rulingDefinition('r2-finding', 'p2', 'r2', 'condition'),
 		],
 	})
+}
+
+/** Logical `gates` pass with a continuing condition ruling, followed by a quantitative `after` pass. */
+export function buildContinuingLogicalDefinition(): QualificationDefinition {
+	const gates = logicalDefinition('gates', 'Gates', [
+		rule('flag', [atom('flag', 'equals', true)], atom('noted', 'equals', true)),
+	])
+	const after = quantitativeDefinition('after', 'After', [
+		factorGroup('total', 'sum', [staticFactor('base', 1)]),
+	])
+	return qualificationDefinition('continuing', 'Continuing', [gates, after], {
+		rulings: [rulingDefinition('note', 'gates', 'flag', 'condition')],
+	})
+}
+
+/** Build an injected reason engine whose every pass fails operationally with a fixed trace/error. */
+export function createFailingEngine(): ReasonInterface {
+	const failingResult: QuantitativeResult = {
+		reasoning: 'quantitative',
+		value: 0,
+		groups: [],
+		count: 0,
+		success: false,
+		trace: ['engine trace'],
+		errors: ['engine boom'],
+	}
+
+	function reason(subjects: readonly Subject[], definition: Definition): readonly ReasonResult[]
+	function reason(subject: Subject, definition: Definition): ReasonResult
+	function reason(
+		subject: Subject | readonly Subject[],
+		_definition: Definition,
+	): ReasonResult | readonly ReasonResult[] {
+		if (Array.isArray(subject)) return subject.map(() => failingResult)
+		return failingResult
+	}
+
+	return {
+		emitter: new Emitter<ReasonEventMap>(),
+		reason,
+		register: () => {},
+		reasoner: () => undefined,
+		reasoners: () => [],
+		supports: () => true,
+		validate: () => ({ valid: true, errors: [], warnings: [] }),
+		destroy: () => {},
+	}
 }

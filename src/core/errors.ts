@@ -7,6 +7,8 @@ import type { QualifierErrorCode } from './types.js'
  * `DEFINITION` — a qualification definition failed semantic validation.
  * `MISMATCH` — a subject is not a record or already carries the reserved
  * `qualification` key. `DESTROYED` — use of a destroyed qualifier.
+ * `ENGINE` — the underlying reason engine threw while running a pass (the
+ * original throw is preserved as `context.cause`).
  */
 export class QualifierError extends Error {
 	readonly code: QualifierErrorCode

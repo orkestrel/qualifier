@@ -5,9 +5,12 @@ import type {
 	Premise,
 	QualificationContext,
 	QualificationDefinition,
+	QualificationEffect,
+	QualificationInput,
 	QualificationPass,
 	QualificationProjection,
 	Ruling,
+	RulingInput,
 } from './types.js'
 import type {
 	Check,
@@ -23,7 +26,13 @@ import type {
 import { EFFECT_ELIGIBILITIES, ELIGIBILITY_PRECEDENCE, QUALIFICATION_KEY } from './constants.js'
 import { QualifierError } from './errors.js'
 import { isFiniteNumber, isRecord, resolveField } from '@orkestrel/contract'
-import { extractAtoms, extractConclusions, formatField, isBounds } from '@orkestrel/reason'
+import {
+	extractAtoms,
+	extractConclusions,
+	formatField,
+	isBounds,
+	isReasonError,
+} from '@orkestrel/reason'
 
 /**
  * Interpolate `{{dotted.path}}` tokens in a message template against a subject.
@@ -281,6 +290,26 @@ export function findRule(definition: LogicalDefinition, id: string): Rule | unde
  * @param definition - The pass definition that produced the result
  * @param result - The evaluated reason result
  * @returns The pass's working projection
+ *
+ * @example
+ * ```ts
+ * import { reasonResultToProjection } from '@orkestrel/qualifier'
+ * import { factorGroup, quantitativeDefinition, staticFactor } from '@orkestrel/reason'
+ *
+ * const cap = quantitativeDefinition('cap', 'TIV cap', [
+ *   factorGroup('limit', 'sum', [staticFactor('base', 500_000)]),
+ * ])
+ * const result = {
+ *   reasoning: 'quantitative' as const,
+ *   value: 500_000,
+ *   groups: [],
+ *   count: 1,
+ *   success: true,
+ *   trace: [],
+ *   errors: [],
+ * }
+ * reasonResultToProjection(cap, result) // 500000
+ * ```
  */
 export function reasonResultToProjection(
 	definition: QualificationPass,
@@ -307,6 +336,15 @@ export function reasonResultToProjection(
  * @param id - The pass id
  * @param result - The evaluated quantitative result
  * @returns A fresh derivation
+ *
+ * @example
+ * ```ts
+ * import { quantitativeResultToDerivation } from '@orkestrel/qualifier'
+ *
+ * const result = { reasoning: 'quantitative' as const, value: 500_000, groups: [], count: 1, success: true, trace: ['cap: 500000'], errors: [] }
+ * quantitativeResultToDerivation('cap', result)
+ * // { id: 'cap', value: 500000, success: true, trace: ['cap: 500000'], errors: [] }
+ * ```
  */
 export function quantitativeResultToDerivation(id: string, result: QuantitativeResult): Derivation {
 	return {
@@ -323,6 +361,13 @@ export function quantitativeResultToDerivation(id: string, result: QuantitativeR
  *
  * @param context - The accumulated projection context
  * @returns A record carrying the context under the reserved key
+ *
+ * @example
+ * ```ts
+ * import { qualificationToRecord } from '@orkestrel/qualifier'
+ *
+ * qualificationToRecord({ cap: 500_000 }) // { qualification: { cap: 500000 } }
+ * ```
  */
 export function qualificationToRecord(
 	context: QualificationContext,
@@ -337,6 +382,14 @@ export function qualificationToRecord(
  * @param id - The pass id to project under
  * @param projection - The pass's working projection
  * @returns A fresh context with the projection added
+ *
+ * @example
+ * ```ts
+ * import { mergeQualificationContext } from '@orkestrel/qualifier'
+ *
+ * mergeQualificationContext({ cap: 500_000 }, 'excess', 250_000)
+ * // { cap: 500000, excess: 250000 }
+ * ```
  */
 export function mergeQualificationContext(
 	context: QualificationContext,
@@ -363,6 +416,21 @@ export function mergeQualificationContext(
  * @param evaluator - The shared reason check evaluator
  * @param labels - Optional field-to-label overrides, keyed by dot-joined field
  * @returns A fresh finding
+ *
+ * @example
+ * ```ts
+ * import { rulingToFinding } from '@orkestrel/qualifier'
+ * import { atom, createEvaluator, logicalDefinition, rule } from '@orkestrel/reason'
+ *
+ * const gates = logicalDefinition('gates', 'Gates', [
+ *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+ * ])
+ * const ruling = { id: 'license', pass: 'gates', rule: 'licensed', effect: 'restriction' as const }
+ * const result = { reasoning: 'logical' as const, conclusion: true, rules: [{ id: 'licensed', applied: true, premises: [true], conclusion: true }], count: 1, success: true, trace: [], errors: [] }
+ * const finding = rulingToFinding(ruling, gates, result, { licensed: false }, createEvaluator())
+ *
+ * finding.applied // true
+ * ```
  */
 export function rulingToFinding(
 	ruling: Ruling,
@@ -401,6 +469,14 @@ export function rulingToFinding(
  * @param findings - The resolved findings
  * @param failed - Whether an operational pass failure occurred
  * @returns The most severe global eligibility
+ *
+ * @example
+ * ```ts
+ * import { deriveFindingEligibility } from '@orkestrel/qualifier'
+ *
+ * const finding = { id: 'license', pass: 'gates', rule: 'licensed', effect: 'restriction' as const, applied: true, premises: [] }
+ * deriveFindingEligibility([finding]) // 'ineligible'
+ * ```
  */
 export function deriveFindingEligibility(findings: Finding[], failed = false): Eligibility {
 	const eligibilities = findings
@@ -440,6 +516,14 @@ export function combineEligibilities(eligibilities: Eligibility[]): Eligibility 
  *
  * @param findings - The resolved findings
  * @returns A fresh record of scope to its combined eligibility
+ *
+ * @example
+ * ```ts
+ * import { deriveScopeEligibilities } from '@orkestrel/qualifier'
+ *
+ * const finding = { id: 'coastal', pass: 'wind', rule: 'coastal', effect: 'restriction' as const, scope: 'wind', applied: true, premises: [] }
+ * deriveScopeEligibilities([finding]) // { wind: 'ineligible' }
+ * ```
  */
 export function deriveScopeEligibilities(
 	findings: Finding[],
@@ -463,6 +547,22 @@ export function deriveScopeEligibilities(
  *
  * @param definition - The qualification definition to check
  * @returns A fresh list of reference-error messages
+ *
+ * @example
+ * ```ts
+ * import { findMissingReferences, qualificationDefinition, rulingDefinition } from '@orkestrel/qualifier'
+ * import { atom, logicalDefinition, rule } from '@orkestrel/reason'
+ *
+ * const gates = logicalDefinition('gates', 'Gates', [
+ *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+ * ])
+ * const definition = qualificationDefinition('standard', 'Standard', [gates], {
+ *   rulings: [rulingDefinition('license', 'gates', 'absent', 'restriction')],
+ * })
+ *
+ * findMissingReferences(definition)
+ * // ["Ruling 'license' references missing rule 'absent' in pass 'gates'"]
+ * ```
  */
 export function findMissingReferences(definition: QualificationDefinition): readonly string[] {
 	const errors: string[] = []
@@ -492,26 +592,17 @@ export function findMissingReferences(definition: QualificationDefinition): read
 }
 
 /**
- * Find duplicate ids in a list, once each.
- *
- * @param ids - The ids to scan
- * @returns A fresh list of ids that appear more than once
- */
-export function findDuplicateIds(ids: readonly string[]): readonly string[] {
-	const seen = new Set<string>()
-	const duplicates = new Set<string>()
-	for (const id of ids) {
-		if (seen.has(id)) duplicates.add(id)
-		else seen.add(id)
-	}
-	return [...duplicates]
-}
-
-/**
  * Determine whether a subject already owns the reserved {@link QUALIFICATION_KEY}.
  *
  * @param subject - The subject to check
  * @returns `true` when the subject owns the reserved key
+ *
+ * @example
+ * ```ts
+ * import { hasReservedKey } from '@orkestrel/qualifier'
+ *
+ * hasReservedKey({ id: 's1', qualification: {} }) // true
+ * ```
  */
 export function hasReservedKey(subject: Subject): boolean {
 	return Object.hasOwn(subject, QUALIFICATION_KEY)
@@ -523,6 +614,13 @@ export function hasReservedKey(subject: Subject): boolean {
  * @param value - The candidate subject to validate
  * @throws {@link QualifierError} `'MISMATCH'` when the value is not a record, or
  * when it already carries the reserved `qualification` key
+ *
+ * @example
+ * ```ts
+ * import { assertSubject } from '@orkestrel/qualifier'
+ *
+ * assertSubject({ id: 's1' }) // narrows to Subject
+ * ```
  */
 export function assertSubject(value: unknown): asserts value is Subject {
 	if (!isRecord(value)) {
@@ -533,5 +631,222 @@ export function assertSubject(value: unknown): asserts value is Subject {
 			'MISMATCH',
 			`Qualification subject must not contain reserved key '${QUALIFICATION_KEY}'`,
 		)
+	}
+}
+
+/**
+ * Map an engine throw caught while running one pass to a typed {@link QualifierError}.
+ *
+ * @remarks
+ * A reason `ReasonError('INVALID')` maps to `DEFINITION` (the engine rejected the
+ * pass as an invalid definition); `ReasonError('DESTROYED')` maps to `DESTROYED`;
+ * every other `ReasonError` code (e.g. `MISSING`) and every non-`ReasonError` throw
+ * (including a `bail: true` reasoner rethrow) maps to `ENGINE`. The original throw
+ * is preserved as `context.cause`.
+ *
+ * @param error - The value caught from the engine's `reason` call
+ * @param pass - The id of the pass that was running
+ * @returns A fresh, typed {@link QualifierError}
+ *
+ * @example
+ * ```ts
+ * import { mapEngineError } from '@orkestrel/qualifier'
+ * import { ReasonError } from '@orkestrel/reason'
+ *
+ * mapEngineError(new ReasonError('MISSING', 'No reasoner registered'), 'cap').code // 'ENGINE'
+ * ```
+ */
+export function mapEngineError(error: unknown, pass: string): QualifierError {
+	if (isReasonError(error)) {
+		if (error.code === 'INVALID') {
+			return new QualifierError(
+				'DEFINITION',
+				`Pass '${pass}' failed engine validation: ${error.message}`,
+				{ pass, cause: error },
+			)
+		}
+		if (error.code === 'DESTROYED') {
+			return new QualifierError(
+				'DESTROYED',
+				`Qualifier engine was destroyed during pass '${pass}'`,
+				{ pass, cause: error },
+			)
+		}
+		return new QualifierError('ENGINE', `Pass '${pass}' engine failure: ${error.message}`, {
+			pass,
+			cause: error,
+		})
+	}
+	const message = error instanceof Error ? error.message : String(error)
+	return new QualifierError('ENGINE', `Pass '${pass}' engine failure: ${message}`, {
+		pass,
+		cause: error,
+	})
+}
+
+/**
+ * Find logical passes carrying no rulings.
+ *
+ * @remarks
+ * A logical pass with no matching ruling can never contribute a finding, so its
+ * rules only ever influence later passes' reads — this is very likely an authoring
+ * oversight.
+ *
+ * @param definition - The qualification definition to check
+ * @returns A fresh list of warning messages
+ *
+ * @example
+ * ```ts
+ * import { findEmptyLogicalPasses, qualificationDefinition } from '@orkestrel/qualifier'
+ * import { atom, logicalDefinition, rule } from '@orkestrel/reason'
+ *
+ * const gates = logicalDefinition('gates', 'Gates', [
+ *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+ * ])
+ * const definition = qualificationDefinition('standard', 'Standard', [gates])
+ *
+ * findEmptyLogicalPasses(definition) // ["Logical pass 'gates' has no rulings"]
+ * ```
+ */
+export function findEmptyLogicalPasses(definition: QualificationDefinition): readonly string[] {
+	const warnings: string[] = []
+	for (const pass of definition.passes) {
+		if (pass.reasoning !== 'logical') continue
+		const hasRuling = (definition.rulings ?? []).some((ruling) => ruling.pass === pass.id)
+		if (!hasRuling) warnings.push(`Logical pass '${pass.id}' has no rulings`)
+	}
+	return warnings
+}
+
+/**
+ * Find quantitative passes never read by a later pass.
+ *
+ * @remarks
+ * A quantitative pass's projected value lives under `qualification.<id>` — if no
+ * later logical premise or quantitative factor field reads that key, the
+ * derivation is dead weight. Reads are collected per later pass: a logical pass's
+ * premise atoms (conclusion atoms are writes, not reads), and a quantitative
+ * pass's field/lookup/range factor sources plus factor checks.
+ *
+ * @param definition - The qualification definition to check
+ * @returns A fresh list of warning messages
+ *
+ * @example
+ * ```ts
+ * import { findUnreadDerivations, qualificationDefinition } from '@orkestrel/qualifier'
+ * import { factorGroup, quantitativeDefinition, staticFactor } from '@orkestrel/reason'
+ *
+ * const cap = quantitativeDefinition('cap', 'TIV cap', [
+ *   factorGroup('limit', 'sum', [staticFactor('base', 500_000)]),
+ * ])
+ * const definition = qualificationDefinition('standard', 'Standard', [cap])
+ *
+ * findUnreadDerivations(definition) // ["Quantitative pass 'cap' is never read by a later pass"]
+ * ```
+ */
+export function findUnreadDerivations(definition: QualificationDefinition): readonly string[] {
+	const warnings: string[] = []
+	definition.passes.forEach((pass, index) => {
+		if (pass.reasoning !== 'quantitative') return
+		const key = formatField(['qualification', pass.id])
+		const reads = new Set<string>()
+		for (const later of definition.passes.slice(index + 1)) {
+			if (later.reasoning === 'logical') {
+				for (const rule of later.rules) {
+					for (const premise of rule.premises) {
+						for (const atom of extractAtoms(premise)) reads.add(formatField(atom.check.field))
+					}
+				}
+			}
+			if (later.reasoning === 'quantitative') {
+				for (const group of later.groups) {
+					for (const factor of group.factors) {
+						if (
+							factor.source.origin === 'field' ||
+							factor.source.origin === 'lookup' ||
+							factor.source.origin === 'range'
+						) {
+							reads.add(formatField(factor.source.field))
+						}
+						for (const check of factor.checks ?? []) reads.add(formatField(check.field))
+					}
+				}
+			}
+		}
+		if (!reads.has(key)) {
+			warnings.push(`Quantitative pass '${pass.id}' is never read by a later pass`)
+		}
+	})
+	return warnings
+}
+
+/**
+ * Build a {@link QualificationDefinition}.
+ *
+ * @remarks
+ * Returns a fresh top-level definition, omitting absent optional keys;
+ * `passes` and `rulings` arrays are copied, and record `metadata` is
+ * shallow-copied so nested values are not deep-cloned.
+ *
+ * @param id - The definition id
+ * @param name - The display name
+ * @param passes - The ordered qualification passes
+ * @param input - Optional description, rulings, and metadata
+ * @returns A fresh qualification definition
+ *
+ * @example
+ * ```ts
+ * import { qualificationDefinition } from '@orkestrel/qualifier'
+ *
+ * qualificationDefinition('standard', 'Standard', [gates], { rulings: [ruling] })
+ * ```
+ */
+export function qualificationDefinition(
+	id: string,
+	name: string,
+	passes: QualificationPass[],
+	input?: QualificationInput,
+): QualificationDefinition {
+	return {
+		id,
+		name,
+		passes: [...passes],
+		...(input?.description === undefined ? {} : { description: input.description }),
+		...(input?.rulings === undefined ? {} : { rulings: [...input.rulings] }),
+		...(input?.metadata === undefined ? {} : { metadata: { ...input.metadata } }),
+	}
+}
+
+/**
+ * Build a {@link Ruling} — one authored consequence for one rule in one pass.
+ *
+ * @param id - The ruling id
+ * @param pass - The logical pass id the rule lives in
+ * @param rule - The rule id whose firing this ruling reacts to
+ * @param effect - The eligibility impact when the rule fires
+ * @param input - Optional selection scope and message template
+ * @returns A fresh ruling
+ *
+ * @example
+ * ```ts
+ * import { rulingDefinition } from '@orkestrel/qualifier'
+ *
+ * rulingDefinition('license', 'gates', 'licensed', 'restriction', { message: 'A license is required' })
+ * ```
+ */
+export function rulingDefinition(
+	id: string,
+	pass: string,
+	rule: string,
+	effect: QualificationEffect,
+	input?: RulingInput,
+): Ruling {
+	return {
+		id,
+		pass,
+		rule,
+		effect,
+		...(input?.scope === undefined ? {} : { scope: input.scope }),
+		...(input?.message === undefined ? {} : { message: input.message }),
 	}
 }

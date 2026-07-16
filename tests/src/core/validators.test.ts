@@ -95,6 +95,11 @@ describe('validators', () => {
 			expect(isRuling(buildDeepRecord(200))).toBe(false)
 			expect(isRuling(buildHostileRecord())).toBe(false)
 		})
+
+		it('rejects a malformed ruling value', () => {
+			const malformed: unknown = { id: 'r', pass: 'p', effect: 'restriction' }
+			expect(isRuling(malformed)).toBe(false)
+		})
 	})
 
 	describe('isQualificationPass', () => {
@@ -112,6 +117,11 @@ describe('validators', () => {
 			expect(() => isQualificationPass(buildCyclicRecord())).not.toThrow()
 			expect(isQualificationPass(buildCyclicRecord())).toBe(false)
 		})
+
+		it('rejects a malformed pass value', () => {
+			const malformed: unknown = { id: 'cap', name: 'Cap', reasoning: 'quantitative' }
+			expect(isQualificationPass(malformed)).toBe(false)
+		})
 	})
 
 	describe('isQualificationDefinition', () => {
@@ -119,6 +129,11 @@ describe('validators', () => {
 
 		it('accepts a complete definition', () => {
 			expect(isQualificationDefinition(valid)).toBe(true)
+		})
+
+		it('rejects a number and null after the pre-guard removal', () => {
+			expect(isQualificationDefinition(42)).toBe(false)
+			expect(isQualificationDefinition(null)).toBe(false)
 		})
 
 		it('accepts optional description, rulings, and record metadata', () => {

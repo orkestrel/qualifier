@@ -13,17 +13,17 @@
 > notices, decides authority, or aggregates a batch. Qualification never mutates
 > its inputs: every result is a fresh object. The internal working projection under
 > `QUALIFICATION_KEY` is discarded after each call and must never be forwarded to
-> a downstream consumer as the rating subject. A failed qualification, global
+> a downstream consumer. A failed qualification, global
 > `ineligible`, or global `referral` is terminal for any caller that qualifies
-> before rating; a scoped restriction removes only that named scope from whatever
+> for any downstream consumer; a scoped restriction removes only that named scope from whatever
 > the caller selects next, so an excluded scope is never evaluated merely to
 > produce an omitted outcome.
 >
 > `Qualifier` either receives an injected `ReasonInterface` (never destroyed by
 > `Qualifier`) or builds and OWNS its own engine (`bail: false`), destroyed in
 > `destroy()`. An injected engine MUST be able to dispatch both quantitative and
-> logical definitions — one it cannot dispatch surfaces the engine's own error,
-> never wrapped by this package. Every `qualify` call fires through `Qualifier`'s
+> logical definitions — one it cannot dispatch surfaces `QualifierError('ENGINE')`
+> wrapping the engine's throw. Every `qualify` call fires through `Qualifier`'s
 > typed `emitter` (AGENTS §13). Source: [`src/core`](../../src/core). Surfaced
 > through the `@src/core` barrel.
 
@@ -65,7 +65,7 @@ per subject.
 
 | Type                            | Kind      | Shape                                                                                                                              |
 | ------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `Eligibility`                   | type      | `'eligible' \| 'ineligible' \| 'referral'` — the pre-rating outcome axis.                                                          |
+| `Eligibility`                   | type      | `'eligible' \| 'ineligible' \| 'referral'` — the eligibility outcome axis.                                                         |
 | `QualificationEffect`           | type      | `'restriction' \| 'referral' \| 'condition'` — an authored ruling's eligibility impact.                                            |
 | `QualificationPass`             | type      | `QuantitativeDefinition \| LogicalDefinition` — one ordered derivation or rule pass.                                               |
 | `QualificationProjection`       | type      | `number \| boolean \| Readonly<Record<string, unknown>>` — one pass's internal working projection.                                 |
@@ -78,8 +78,8 @@ per subject.
 | `Derivation`                    | interface | `{ id, value, success, trace, errors }` — one quantitative pass's audit result.                                                    |
 | `QualificationDefinition`       | interface | `{ id, name, description?, passes, rulings?, metadata? }` — a pure authored qualification definition.                              |
 | `QualificationResult`           | interface | `{ id, name, eligibility, scopes, findings, derivations, success, trace, errors }` — one subject's complete qualification outcome. |
-| `QualificationValidationResult` | interface | `{ valid, errors, warnings }` — semantic definition validation.                                                                    |
-| `QualifierErrorCode`            | type      | `'DEFINITION' \| 'MISMATCH' \| 'DESTROYED'` — programmer-error codes.                                                              |
+| `QualificationValidationResult` | type      | `{ valid, errors, warnings }` — semantic definition validation.                                                                    |
+| `QualifierErrorCode`            | type      | `'DEFINITION' \| 'MISMATCH' \| 'DESTROYED' \| 'ENGINE'` — programmer-error codes.                                                  |
 | `QualifierEventMap`             | type      | `derive(derivation)` · `finding(finding)` · `qualify(result)` · `destroy()`.                                                       |
 | `QualifierOptions`              | interface | `{ engine?, validate?, labels?, on?, error? }` — input to `createQualifier`.                                                       |
 | `QualifierInterface`            | interface | `emitter` + `qualify` (one subject) + `validate` + `destroy`.                                                                      |
@@ -110,6 +110,10 @@ condition never blocks its subject — and `ELIGIBILITY_PRECEDENCE` orders sever
 | ------------------ | -------- | ---------------------------------------------------- |
 | `QualifierError`   | class    | Carries a `QualifierErrorCode` and optional context. |
 | `isQualifierError` | function | Safely narrows a caught value to `QualifierError`.   |
+
+`ENGINE` marks an underlying reason engine throw that fits no other code (e.g. a
+missing reasoner) — the original throw is preserved as `context.cause`. A
+`DEFINITION`/`INVALID` or `DESTROYED` engine throw maps to the matching code instead.
 
 ```ts
 import { isQualifierError, QualifierError } from '@orkestrel/qualifier'
@@ -174,9 +178,13 @@ orchestration and ownership lifecycle.
 | `combineEligibilities`           | function | Return the most severe eligibility in a list.                        |
 | `deriveScopeEligibilities`       | function | Derive one eligibility per finding scope.                            |
 | `findMissingReferences`          | function | Find rulings whose pass or rule does not exist.                      |
-| `findDuplicateIds`               | function | Find duplicate pass or ruling ids once each.                         |
 | `hasReservedKey`                 | function | Whether a subject already owns `QUALIFICATION_KEY`.                  |
 | `assertSubject`                  | function | Narrow and reject malformed or reserved-key subjects.                |
+| `mapEngineError`                 | function | Map an engine throw to a typed `QualifierError`.                     |
+| `findEmptyLogicalPasses`         | function | Find logical passes carrying no rulings.                             |
+| `findUnreadDerivations`          | function | Find quantitative passes never read by a later pass.                 |
+| `qualificationDefinition`        | function | Build a fresh `QualificationDefinition`.                             |
+| `rulingDefinition`               | function | Build a fresh `Ruling`.                                              |
 
 Every helper is pure and side-effect-free — `Qualifier` composes them and keeps only
 the ordered orchestration and ownership lifecycle. The message and premise renderers
@@ -251,7 +259,6 @@ discarded after each call. The reference-scan and subject-guard helpers back
 ```ts
 import {
 	assertSubject,
-	findDuplicateIds,
 	findMissingReferences,
 	hasReservedKey,
 	qualificationDefinition,
@@ -268,18 +275,15 @@ const definition = qualificationDefinition('standard', 'Standard', [gates], {
 
 findMissingReferences(definition)
 // ["Ruling 'license' references missing rule 'absent' in pass 'gates'"]
-findDuplicateIds(['a', 'b', 'a']) // ['a']
 hasReservedKey({ id: 's1', qualification: {} }) // true
 assertSubject({ id: 's1' }) // narrows to Subject; throws QualifierError('MISMATCH') on a reserved key
 ```
 
 ### Factories
 
-| API                       | Kind     | Builds                             |
-| ------------------------- | -------- | ---------------------------------- |
-| `createQualifier`         | function | A `QualifierInterface`.            |
-| `qualificationDefinition` | function | A fresh `QualificationDefinition`. |
-| `rulingDefinition`        | function | A fresh `Ruling`.                  |
+| API               | Kind     | Builds                  |
+| ----------------- | -------- | ----------------------- |
+| `createQualifier` | function | A `QualifierInterface`. |
 
 ```ts
 import { createQualifier, qualificationDefinition, rulingDefinition } from '@orkestrel/qualifier'
@@ -301,9 +305,9 @@ Every factory returns a fresh value and omits absent optional keys.
 
 ### Entities
 
-| API         | Kind  | Summary                                                                                                            |
-| ----------- | ----- | ------------------------------------------------------------------------------------------------------------------ |
-| `Qualifier` | class | Owns or borrows one reason engine, validates definitions, runs ordered passes, and returns pre-rating eligibility. |
+| API         | Kind  | Summary                                                                                                 |
+| ----------- | ----- | ------------------------------------------------------------------------------------------------------- |
+| `Qualifier` | class | Owns or borrows one reason engine, validates definitions, runs ordered passes, and returns eligibility. |
 
 ## Methods
 
@@ -387,7 +391,7 @@ Global eligibility is derived only from **unscoped** applied findings:
 
 A failed pass adds a synthetic referral impact. Operational failure is therefore
 fail-closed: a subject with incomplete eligibility evidence should not proceed to
-downstream rating.
+any downstream decision step.
 
 Severity is deterministic:
 
@@ -420,7 +424,7 @@ result.scopes.wind // 'ineligible'
 ```
 
 The caller removes `wind` from the selected scope ids before any downstream
-rating step. It does not evaluate the wind scope and then suppress its outcome.
+step. It does not evaluate the wind scope and then suppress its outcome.
 
 A missing scope entry means `eligible`. A scoped `condition` leaves the scope
 eligible and contributes evidence a later consumer may act on.
@@ -432,19 +436,23 @@ Structural validation and semantic validation remain separate.
 `isQualificationDefinition` checks exact record shape. `Qualifier.validate` checks:
 
 - non-empty definition id and name
-- at least one pass
+- each pass is a valid quantitative or logical definition
+- each ruling is a well-formed ruling record
 - unique pass ids
 - unique ruling ids
 - every ruling references an existing pass
 - every ruling references a logical pass
 - every ruling references an existing rule in that pass
 - no pass id equals `QUALIFICATION_KEY`
+- warnings for definitions with no passes
 - warnings for logical passes with no rulings
 - warnings for quantitative derivations never read by a later pass
 
 `qualify` throws `QualifierError('DEFINITION')` for a semantically invalid authored
 definition when `validate` is enabled. A malformed reason result is an operational
-qualification failure and returns a referral result instead of throwing.
+qualification failure and returns a referral result instead of throwing. A
+definition with no passes is valid (a warning only) — every subject qualifies
+vacuously eligible against it.
 
 ## Patterns
 
@@ -541,7 +549,7 @@ const selected = items.filter((item) => {
 })
 ```
 
-### Conditions do not block rating
+### Conditions do not block downstream work
 
 ```ts
 const condition = rulingDefinition('vacant', 'gates', 'vacant', 'condition', {
@@ -564,12 +572,12 @@ only. Any downstream status derived from that evidence is outside this package.
 
 ```ts
 const referral = rulingDefinition('roof', 'gates', 'roof', 'referral', {
-	message: 'Roof age requires underwriting review',
+	message: 'Roof age requires manual review',
 })
 ```
 
 An unscoped applied referral returns `eligibility: 'referral'`. A caller that
-qualifies before rating should treat that outcome as terminal and skip downstream
+qualifies for a downstream consumer should treat that outcome as terminal and skip downstream
 work.
 
 ### Engine injection
@@ -783,7 +791,7 @@ Guide parity must verify every backticked export and every `QualifierInterface` 
 
 ## Practices
 
-- Qualify before any downstream rating or decision step.
+- Qualify before any downstream work or decision step.
 - Treat `success: false` as terminal and fail closed to referral.
 - Use unscoped rulings for global eligibility and scoped rulings for per-scope selection.
 - Keep quantitative derivations under `qualification`; never flatten them onto the caller's subject.

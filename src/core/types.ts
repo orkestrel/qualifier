@@ -5,10 +5,11 @@ import type {
 	LogicalDefinition,
 	QuantitativeDefinition,
 	ReasonInterface,
+	ReasonValidationResult,
 	Subject,
 } from '@orkestrel/reason'
 
-/** The pre-rating outcome axis. */
+/** The eligibility outcome axis. */
 export type Eligibility = 'eligible' | 'ineligible' | 'referral'
 
 /** An authored ruling's eligibility impact. */
@@ -102,14 +103,10 @@ export interface QualificationResult {
 }
 
 /** Semantic definition validation. */
-export interface QualificationValidationResult {
-	readonly valid: boolean
-	readonly errors: readonly string[]
-	readonly warnings: readonly string[]
-}
+export type QualificationValidationResult = ReasonValidationResult
 
 /** A coded {@link QualifierError} programmer-error code. */
-export type QualifierErrorCode = 'DEFINITION' | 'MISMATCH' | 'DESTROYED'
+export type QualifierErrorCode = 'DEFINITION' | 'MISMATCH' | 'DESTROYED' | 'ENGINE'
 
 /** The push observation surface of a {@link QualifierInterface} (AGENTS §13). */
 export type QualifierEventMap = {
@@ -128,7 +125,7 @@ export interface QualifierOptions {
 	readonly error?: EmitterErrorHandler
 }
 
-/** One qualifier — owns or borrows one reason engine and returns pre-rating eligibility. */
+/** One qualifier — owns or borrows one reason engine and returns eligibility. */
 export interface QualifierInterface {
 	readonly emitter: EmitterInterface<QualifierEventMap>
 	qualify(subject: Subject, definition: QualificationDefinition): QualificationResult
