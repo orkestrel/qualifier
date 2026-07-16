@@ -1,6 +1,6 @@
 # @orkestrel/qualifier
 
-A typed **pre-rating eligibility engine** over [`@orkestrel/reason`](https://github.com/orkestrel/reason):
+A typed **eligibility engine** over [`@orkestrel/reason`](https://github.com/orkestrel/reason):
 authored **passes** — quantitative derivations and logical rule gates — run in order
 against a **subject** (a plain data record) to produce **findings** (evidence-rich
 ruling outcomes), **derivations** (quantitative audit trails), and **eligibility**
