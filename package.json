@@ -1,7 +1,7 @@
 {
 	"name": "@orkestrel/qualifier",
 	"version": "0.0.1",
-	"description": "A typed pre-rating eligibility engine: ordered quantitative and logical passes qualify a subject into program-level and scoped eligibility with evidence-rich findings. Part of the @orkestrel line.",
+	"description": "A typed eligibility engine: ordered quantitative and logical passes qualify a subject into program-level and scoped eligibility with evidence-rich findings. Part of the @orkestrel line.",
 	"keywords": [
 		"eligibility",
 		"qualifier",
