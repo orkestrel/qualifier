@@ -2,7 +2,7 @@
 name: builder
 description: Implements one bounded, fully-specified unit exactly as dispatched. Writes only within its owned files, validates scoped and read-only, and STOPS with a deviation report the moment reality diverges from the plan. Never re-plans, never investigates.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: composer
+model: sonnet
 effort: low
 ---
 

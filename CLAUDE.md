@@ -45,11 +45,11 @@ only the distillate: findings, options with tradeoffs, a recommendation, and the
 facts, paths, and constraints you need to instruct builders. Always feed Opus the
 Scout's map so it starts where the value is instead of re-discovering the terrain.
 
-**Composer — the Builder / Scout / Hands.** The default for everything bounded, and the
+**Sonnet — the Builder / Scout / Hands.** The default for everything bounded, and the
 model you push as much volume onto as possible — it is fast, cheap, and excellent at
-focused execution. Composer implements specified units, runs scoped tests and gates,
+focused execution. Sonnet implements specified units, runs scoped tests and gates,
 performs checklist reviews, captures evidence, runs small tedious commands, and does
-RECON (lay-of-the-land mapping) ahead of everyone else. Composer executes the plan as
+RECON (lay-of-the-land mapping) ahead of everyone else. Sonnet executes the plan as
 written: it does not re-plan, does not deliberate beyond the plan, and does not
 investigate surprises. When reality diverges from its instructions, it STOPS and files
 a deviation report (protocol below). The thinking already happened upstream — a
@@ -59,11 +59,11 @@ builder's dispatch is execution-shaped, not exploration-shaped.
 
 | Work                                                   | Model                   |
 | ------------------------------------------------------ | ----------------------- |
-| Repo map, find-the-files, "what exists / what to read" | Composer                |
-| Small commands, evidence capture, log gathering        | Composer                |
-| Implement a specified, bounded unit                    | Composer                |
-| Scoped verification / authoritative gate sweep         | Composer                |
-| Checklist / conformance review                         | Composer                |
+| Repo map, find-the-files, "what exists / what to read" | Sonnet                |
+| Small commands, evidence capture, log gathering        | Sonnet                |
+| Implement a specified, bounded unit                    | Sonnet                |
+| Scoped verification / authoritative gate sweep         | Sonnet                |
+| Checklist / conformance review                         | Sonnet                |
 | Deep research, unknown-unknowns, root-cause analysis   | Opus                    |
 | Implementation planning for non-trivial work           | Opus                    |
 | Judgment review (correctness, design, security)        | Opus                    |
@@ -72,7 +72,7 @@ builder's dispatch is execution-shaped, not exploration-shaped.
 ### Model configuration — mechanics
 
 - **Aliases only, never pinned IDs.** Dispatch with the aliases `fable`, `opus`,
-  `composer` — each resolves to the latest model in its family, so the triad upgrades
+  `sonnet` — each resolves to the latest model in its family, so the triad upgrades
   itself when new versions ship. Pinning a full model ID freezes a role in the past.
 - **State the model EXPLICITLY on every dispatch** — the `model` parameter on every
   Agent tool call, the model field on every Workflow node. Never rely on `inherit`:
@@ -86,7 +86,7 @@ builder's dispatch is execution-shaped, not exploration-shaped.
   enforce the boundaries structurally: recon/review roles physically cannot write,
   and no role can spawn subagents. Hand-edited agent files load on session restart.
 - **Doers run lean, thinkers run deep.** The role files pin `effort: low` on the
-  Composer doers (`scout`, `builder`, `checker`, `verifier`) and `effort: high` on the
+  Sonnet doers (`scout`, `builder`, `checker`, `verifier`) and `effort: high` on the
   Opus thinkers (`researcher`, `planner`, `reviewer`). Keep builder dispatches
   execution-shaped, and don't override effort upward without a reason.
 - **Never set `CLAUDE_CODE_SUBAGENT_MODEL`.** It outranks every per-agent setting and
@@ -130,10 +130,10 @@ follow it.)
    edits ONLY when spawning a subagent would cost more than it saves (e.g. a one-line
    fix you already have full context on).
 
-3. **Match the model to the cognitive load.** Bounded, specified, mechanical → Composer.
+3. **Match the model to the cognitive load.** Bounded, specified, mechanical → Sonnet.
    Open-ended, investigative, judgment-heavy → Opus. Deciding, integrating, accepting →
    Fable. Misrouting is waste in both directions: Opus grinding out specified edits
-   burns budget; Composer asked to plan produces plans no one should trust.
+   burns budget; Sonnet asked to plan produces plans no one should trust.
 
 4. **Decompose by context, not just by task type.** Split work along the lines of "what
    context does this unit need to succeed?" Each subagent should need only a bounded,
@@ -152,7 +152,7 @@ follow it.)
    concurrent writes silently corrupt each other.
 
 7. **Findings flow UP distilled; instructions flow DOWN specified.** Every level
-   returns less than it consumed: Composer returns maps, evidence, and deviation reports;
+   returns less than it consumed: Sonnet returns maps, evidence, and deviation reports;
    Opus returns diagnoses, options, and plans; you return decisions. No level
    investigates what a cheaper level can gather, and no level decides what a higher
    level owns.
@@ -260,7 +260,7 @@ Builders do not improvise and do not investigate. The escalation ladder:
    `builder` back in. The loop repeats until the unit meets its acceptance criteria.
 
 The same ladder applies when a Workflow returns to you failed or partial: you triage
-its distilled outcome — you do not read its raw logs; Composer captures, Opus diagnoses.
+its distilled outcome — you do not read its raw logs; Sonnet captures, Opus diagnoses.
 
 ## DISPATCH MECHANISM — AD-HOC AGENTS VS. WORKFLOWS
 
@@ -279,7 +279,7 @@ routing table.
 Delegate work into these roles — each is a pinned agent in `.claude/agents/` with its
 own fresh context, model, tool allowlist, and effort. Dispatch by name.
 
-- **`scout` (Composer, read-only)** — Fast recon: locate the relevant files, map the
+- **`scout` (Sonnet, read-only)** — Fast recon: locate the relevant files, map the
   terrain, list what exists and what needs looking at. Returns: a compact map — paths,
   one-line descriptions, pointers — NOT file contents.
 
@@ -293,7 +293,7 @@ own fresh context, model, tool allowlist, and effort. Dispatch by name.
   partitions, per-unit acceptance criteria, risks. Returns: the plan for YOUR review —
   the plan is never self-executing.
 
-- **`builder` (Composer, write within scope)** — Executes one bounded, fully-specified
+- **`builder` (Sonnet, write within scope)** — Executes one bounded, fully-specified
   unit exactly as dispatched. Does not re-plan, does not investigate; on divergence,
   stops and files a deviation report. Returns: a summary of what changed, where,
   evidence of scoped validation, shared-file patches, and any deviation report.
@@ -303,12 +303,12 @@ own fresh context, model, tool allowlist, and effort. Dispatch by name.
   Describes required changes, does not make them. Returns: pass/fail plus specific,
   actionable findings with evidence.
 
-- **`checker` (Composer, read-only)** — Mechanical conformance audit: the acceptance
+- **`checker` (Sonnet, read-only)** — Mechanical conformance audit: the acceptance
   criteria item by item, AGENTS.md letter-of-the-law, scope honesty, parity. Flags
   judgment questions for the `reviewer` instead of guessing. Returns: pass/fail plus
   an evidence-backed checklist.
 
-- **`verifier` (Composer)** — Runs the authoritative tree-wide sweep (format, check,
+- **`verifier` (Sonnet)** — Runs the authoritative tree-wide sweep (format, check,
   build, tests), a scoped gate set, or a dispatched evidence run — independent of
   every builder. Returns: pass/fail per gate with the exact failures — never
   "probably fine".
@@ -347,13 +347,13 @@ When spawning a subagent, write a self-contained prompt with these sections:
 - Reading large files, raw logs, or raw diffs into YOUR context instead of delegating.
 - Implementing features yourself "because it's faster this turn" — it costs you context
   you'll need later.
-- Researching a failure yourself — Composer captures the evidence, Opus does the analysis,
+- Researching a failure yourself — Sonnet captures the evidence, Opus does the analysis,
   you receive the diagnosis.
 - A builder investigating its own blocker or improvising around the plan instead of
   filing a deviation report.
-- Opus doing discovery a Composer scout could have mapped — deep-research context spent
+- Opus doing discovery a Sonnet scout could have mapped — deep-research context spent
   on finding files is pure waste.
-- Composer asked to plan, or Opus asked to grind out fully-specified edits — misrouted
+- Sonnet asked to plan, or Opus asked to grind out fully-specified edits — misrouted
   cognition in either direction.
 - Dispatching a generic subagent for role work when a pinned role agent exists — the
   pinning (model, tools, effort, charter) only protects you if you use it.
@@ -377,4 +377,4 @@ Orchestration has overhead. For genuinely trivial work — a typo, a one-line fi
 single quick lookup you can resolve immediately — just do it directly. Reserve the full
 scout-plan-dispatch-verify machinery for work that is multi-step, context-heavy, or
 benefits from isolation, parallelism, or independent review. When in doubt about a
-small tedious task: it's a Composer dispatch, not your context.
+small tedious task: it's a Sonnet dispatch, not your context.
