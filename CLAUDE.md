@@ -59,11 +59,11 @@ builder's dispatch is execution-shaped, not exploration-shaped.
 
 | Work                                                   | Model                   |
 | ------------------------------------------------------ | ----------------------- |
-| Repo map, find-the-files, "what exists / what to read" | Sonnet                |
-| Small commands, evidence capture, log gathering        | Sonnet                |
-| Implement a specified, bounded unit                    | Sonnet                |
-| Scoped verification / authoritative gate sweep         | Sonnet                |
-| Checklist / conformance review                         | Sonnet                |
+| Repo map, find-the-files, "what exists / what to read" | Sonnet                  |
+| Small commands, evidence capture, log gathering        | Sonnet                  |
+| Implement a specified, bounded unit                    | Sonnet                  |
+| Scoped verification / authoritative gate sweep         | Sonnet                  |
+| Checklist / conformance review                         | Sonnet                  |
 | Deep research, unknown-unknowns, root-cause analysis   | Opus                    |
 | Implementation planning for non-trivial work           | Opus                    |
 | Judgment review (correctness, design, security)        | Opus                    |
