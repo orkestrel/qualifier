@@ -26,7 +26,7 @@ import {
 	rulingDefinition,
 	rulingToFinding,
 } from '@src/core'
-import type { Comparison } from '@orkestrel/reason'
+import type { CheckResult, Comparison } from '@orkestrel/reason'
 import {
 	atom,
 	check,
@@ -529,7 +529,11 @@ describe('helpers', () => {
 
 		it('premiseCheck omits met when result.met is undefined', () => {
 			const authored = check('age', 'above', 18)
-			const premise = premiseCheck(authored, { field: 'age', actual: 25, met: undefined })
+			const premise = premiseCheck(authored, {
+				field: 'age',
+				actual: 25,
+				met: undefined,
+			} as unknown as CheckResult)
 			expect('met' in premise).toBe(false)
 		})
 
@@ -591,7 +595,7 @@ describe('helpers', () => {
 			const original = new ReasonError('INVALID', 'v')
 			const mapped = mapEngineError(original, 'p')
 			expect(mapped.code).toBe('DEFINITION')
-			expect(mapped.context?.cause).toBe(original)
+			expect((mapped.context as { cause?: unknown }).cause).toBe(original)
 		})
 
 		it('maps ReasonError DESTROYED to DESTROYED', () => {
