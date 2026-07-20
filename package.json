@@ -10,9 +10,7 @@
 		"typescript"
 	],
 	"homepage": "https://github.com/orkestrel/qualifier#readme",
-	"bugs": {
-		"url": "https://github.com/orkestrel/qualifier/issues"
-	},
+	"bugs": "https://github.com/orkestrel/qualifier/issues",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -72,8 +70,9 @@
 	"devDependencies": {
 		"@microsoft/api-extractor": "^7.58.11",
 		"@orkestrel/guide": "^0.0.5",
-		"@orkestrel/scaffold": "^0.0.1",
+		"@orkestrel/scaffold": "^0.0.2",
 		"@types/node": "^26.1.1",
+		"@vitest/browser-playwright": "^4.1.10",
 		"oxfmt": "^0.59.0",
 		"oxlint": "^1.74.0",
 		"typescript": "^6.0.3",
