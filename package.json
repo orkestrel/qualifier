@@ -1,6 +1,6 @@
 {
 	"name": "@orkestrel/qualifier",
-	"version": "0.0.6",
+	"version": "0.0.7",
 	"description": "A typed eligibility engine: ordered quantitative and logical passes qualify a subject into program-level and scoped eligibility with evidence-rich findings. Part of the @orkestrel line.",
 	"keywords": [
 		"eligibility",
@@ -64,12 +64,12 @@
 	},
 	"dependencies": {
 		"@orkestrel/contract": "^0.0.8",
-		"@orkestrel/emitter": "^0.0.3",
-		"@orkestrel/reason": "^0.0.3"
+		"@orkestrel/emitter": "^0.0.4",
+		"@orkestrel/reason": "^0.0.4"
 	},
 	"devDependencies": {
 		"@microsoft/api-extractor": "^7.58.12",
-		"@orkestrel/guide": "^0.0.5",
+		"@orkestrel/guide": "^0.0.6",
 		"@orkestrel/scaffold": "^0.0.6",
 		"@types/node": "^26.1.2",
 		"@vitest/browser-playwright": "^4.1.10",
