@@ -57,7 +57,10 @@ export class Qualifier implements QualifierInterface {
 	#destroyed = false
 
 	constructor(options?: QualifierOptions) {
-		this.#emitter = new Emitter({ on: options?.on, error: options?.error })
+		this.#emitter = new Emitter({
+			...(options?.on === undefined ? {} : { on: options.on }),
+			...(options?.error === undefined ? {} : { error: options.error }),
+		})
 		this.#evaluator = createEvaluator()
 		this.#owned = options?.engine === undefined
 		this.#engine =

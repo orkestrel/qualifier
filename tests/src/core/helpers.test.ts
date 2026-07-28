@@ -176,8 +176,8 @@ describe('helpers', () => {
 			expect(sentence).toBe('age is more than 18 → met')
 		})
 
-		it('renders a description-only premise with met undefined as unknown', () => {
-			expect(describePremise({ description: 'Some description', met: undefined })).toBe(
+		it('renders a description-only premise without met as unknown', () => {
+			expect(describePremise({ description: 'Some description' })).toBe(
 				'Some description → unknown',
 			)
 		})

@@ -16,7 +16,7 @@ import {
 	fieldFactor,
 	quantitativeDefinition,
 	staticFactor,
-} from '@src/core'
+} from '@orkestrel/reason'
 
 const reason = createReason({ reasoners: [createQuantitativeReasoner()] })
 
@@ -566,7 +566,7 @@ import {
 	lookupFactor,
 	quantitativeDefinition,
 	transform,
-} from '@src/core'
+} from '@orkestrel/reason'
 
 const reason = createReason({ reasoners: [createQuantitativeReasoner()] })
 
@@ -599,7 +599,13 @@ An `enabled: false` factor or group is skipped and OMITTED from results; a `requ
 The three operators (`Evaluator` / `Transformer` / `Aggregator`) are usable directly, independent of any reasoner — the `QuantitativeReasoner` composes them internally, but each is a total, injectable seam:
 
 ```ts
-import { check, createAggregator, createEvaluator, createTransformer, transform } from '@src/core'
+import {
+	check,
+	createAggregator,
+	createEvaluator,
+	createTransformer,
+	transform,
+} from '@orkestrel/reason'
 
 const evaluator = createEvaluator()
 evaluator.evaluate(check('age', 'above', 18), { age: 25 }) // { field: 'age', met: true, actual: 25 }
@@ -672,7 +678,7 @@ import {
 	createReason,
 	logicalDefinition,
 	rule,
-} from '@src/core'
+} from '@orkestrel/reason'
 
 const reason = createReason({ reasoners: [createLogicalReasoner()] })
 
@@ -712,7 +718,7 @@ import {
 	operation,
 	symbolicDefinition,
 	variable,
-} from '@src/core'
+} from '@orkestrel/reason'
 
 const reason = createReason({ reasoners: [createSymbolicReasoner()] })
 
@@ -749,7 +755,7 @@ import {
 	fact,
 	inference,
 	inferentialDefinition,
-} from '@src/core'
+} from '@orkestrel/reason'
 
 const reason = createReason({ reasoners: [createInferentialReasoner()] })
 
@@ -810,7 +816,7 @@ import {
 	quantitativeDefinition,
 	replaceGroup,
 	staticFactor,
-} from '@src/core'
+} from '@orkestrel/reason'
 
 const base = quantitativeDefinition('risk', 'Risk', [
 	factorGroup('drivers', 'sum', [staticFactor('floor', 10)]),
@@ -849,7 +855,7 @@ import {
 	fieldFactor,
 	quantitativeDefinition,
 	staticFactor,
-} from '@src/core'
+} from '@orkestrel/reason'
 
 const draft = createDefinitionBuilder(
 	quantitativeDefinition('risk', 'Risk', [
@@ -882,7 +888,7 @@ Managers are KIND-FREE: an off-kind mutation (`draft.rules.append(...)` on a qua
 The subject side is `Workspace`-shaped — one flat collection of fields, so verbs sit directly on the builder (no managers, no `append` / `prepend`). The `id` is OPTIONAL and immutable through the builder — when absent the builder is ANONYMOUS (`.id` is `undefined`, `build()` emits no `id` key); `repeat` turns one accumulated subject into a deterministic batch.
 
 ```ts
-import { createQuantitativeReasoner, createReason, createSubjectBuilder } from '@src/core'
+import { createQuantitativeReasoner, createReason, createSubjectBuilder } from '@orkestrel/reason'
 
 const reason = createReason({ reasoners: [createQuantitativeReasoner()] })
 
@@ -904,7 +910,7 @@ const results = reason.reason(cohort, definition) // the batch overload, as ever
 The `Reason` exposes a typed `emitter` (AGENTS §13) for fire-and-forget observers — logging, metrics, an audit trail. Subscribe via `reason.emitter.on(...)`, or wire initial listeners through the reserved `on` option (§8) with the `error` option as the emitter's OWN listener-error handler.
 
 ```ts
-import { createQuantitativeReasoner, createReason } from '@src/core'
+import { createQuantitativeReasoner, createReason } from '@orkestrel/reason'
 
 const reason = createReason({
 	reasoners: [createQuantitativeReasoner()],
@@ -941,7 +947,7 @@ draft.emitter.on('merge', (reasoning) => console.log(`merged a ${reasoning} revi
 Definitions are JSON-serializable data, so they arrive from storage / the wire as `unknown`. Narrow in two passes: the structural guard (`isDefinition` — exact records, total on adversarial input, §14), then the semantic pass (`validate` — ids present, sources declared, non-empty rule sets) whose `warnings` flag runnable-but-suspicious definitions.
 
 ```ts
-import { createLogicalReasoner, createReason, isDefinition } from '@src/core'
+import { createLogicalReasoner, createReason, isDefinition } from '@orkestrel/reason'
 import { parseJSON } from '@orkestrel/contract'
 
 const reason = createReason({ reasoners: [createLogicalReasoner()] })
