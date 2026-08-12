@@ -197,7 +197,7 @@ export function premiseCheck(
 		comparison: check.operator,
 		expected: check.value,
 		actual: result.actual,
-		...(result.met === undefined ? {} : { met: result.met }),
+		met: result.met,
 	}
 }
 
