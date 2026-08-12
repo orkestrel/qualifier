@@ -983,7 +983,7 @@ Prefer this at boundaries over the orchestrator's `validate: true` option (which
 
 ## Tests
 
-- [`tests/guides/src/parity.test.ts`](../../tests/guides/src/parity.test.ts) — the `## Surface` ↔ `src/core` bijection (value + type exports) and the `## Methods` ↔ interface-method bijection.
+- [`tests/guides.test.ts`](../../tests/guides.test.ts) — the `## Surface` ↔ `src/core` bijection (value + type exports) and the `## Methods` ↔ interface-method bijection.
 - [`tests/src/core/Reason.test.ts`](../../tests/src/core/Reason.test.ts) — the orchestrator: dispatch, batch order, `bail` both ways, the `MISSING` / `INVALID` / `DESTROYED` codes, event sequences, idempotent `destroy`, build-outside equivalence (a builder's `build()` output reasons identically to inline plain data).
 - [`tests/src/core/builders/DefinitionBuilder.test.ts`](../../tests/src/core/builders/DefinitionBuilder.test.ts) — the definition builder: mutation → `build` round-trips per manager, inert off-kind managers, per-manager event pins, manager + builder destroy semantics, brand-forge negatives, seed immutability.
 - [`tests/src/core/builders/SubjectBuilder.test.ts`](../../tests/src/core/builders/SubjectBuilder.test.ts) — the subject builder: id defaulting + immutability + anonymous builds, batch `remove`, incoming-wins `merge`, deterministic `repeat`, `build` determinism, destroy semantics.
