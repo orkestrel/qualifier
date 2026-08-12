@@ -24,7 +24,7 @@
 > `destroy()`. An injected engine MUST be able to dispatch both quantitative and
 > logical definitions — one it cannot dispatch surfaces `QualifierError('ENGINE')`
 > wrapping the engine's throw. Every `qualify` call fires through `Qualifier`'s
-> typed `emitter` (AGENTS §13). Source: [`src/core`](../../src/core). Surfaced
+> typed `emitter` (AGENTS §13). Source: [`src/core`](../src/core). Surfaced
 > through the `@src/core` barrel.
 
 ## Surface
