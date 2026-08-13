@@ -20,37 +20,6 @@ import {
 	transform,
 } from '@orkestrel/reason'
 
-/** A recorder that captures callback invocations without mocking behavior. */
-export interface TestRecorderInterface<TArgs extends readonly unknown[]> {
-	readonly calls: readonly TArgs[]
-	readonly count: number
-	readonly handler: (...args: TArgs) => void
-	clear(): void
-}
-
-/**
- * Create a test recorder — a real callback that records every invocation.
- *
- * @returns A recorder with `handler`, `calls`, `count`, and `clear`
- */
-export function createRecorder<TArgs extends readonly unknown[]>(): TestRecorderInterface<TArgs> {
-	const calls: TArgs[] = []
-	return {
-		get calls() {
-			return calls
-		},
-		get count() {
-			return calls.length
-		},
-		handler: (...args: TArgs) => {
-			calls.push(args)
-		},
-		clear() {
-			calls.length = 0
-		},
-	}
-}
-
 /** Build a cyclic record for adversarial guard tests. */
 export function buildCyclicRecord(): Record<string, unknown> {
 	const record: Record<string, unknown> = { id: 'cycle' }

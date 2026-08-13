@@ -21,6 +21,7 @@ import {
 	staticFactor,
 	transform,
 } from '@orkestrel/reason'
+import { createRecorder } from '@orkestrel/test'
 import {
 	buildCapExcessGatesDefinition,
 	buildConditionDefinition,
@@ -30,7 +31,6 @@ import {
 	buildReferralDefinition,
 	buildScopedWindDefinition,
 	createFailingEngine,
-	createRecorder,
 } from '../../setup'
 
 const FORBIDDEN_RESULT_KEYS: readonly string[] = [
