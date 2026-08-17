@@ -127,29 +127,69 @@ try {
 
 ### Validators
 
-All validators are total, exact guards built from `@orkestrel/contract` combinators.
-They return `false` for adversarial input and never throw.
+Validators have two postures, split by who produces the value. Authored-input guards are exact:
+they reject unknown keys because this package owns the stored record. Result guards are open: they
+admit unknown members, prototypes, and class instances while checking every published member this
+package reads. This matters when a package borrows a `QualifierInterface`; the implementation that
+produces `qualify` and `validate` results may live outside this package. Every validator remains
+total, refuses arrays where a record is required, returns `false` for hostile reads, and never
+throws.
 
-| API                         | Kind     | Narrows to                 |
-| --------------------------- | -------- | -------------------------- |
-| `isEligibility`             | const    | `Eligibility`.             |
-| `isQualificationEffect`     | const    | `QualificationEffect`.     |
-| `isRuling`                  | function | `Ruling`.                  |
-| `isQualificationPass`       | function | `QualificationPass`.       |
-| `isQualificationDefinition` | function | `QualificationDefinition`. |
+| API                               | Kind     | Posture | Checks                                                                                                                             | Leaves unchecked and why                                                                                              |
+| --------------------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `isEligibility`                   | const    | total   | Membership in `Eligibility`.                                                                                                       | Nothing; a scalar union has no open/exact axis.                                                                       |
+| `isQualificationEffect`           | const    | total   | Membership in `QualificationEffect`.                                                                                               | Nothing; a scalar union has no open/exact axis.                                                                       |
+| `isEligibilityRecord`             | function | open    | Every own string-named value, including non-enumerable values, through `isEligibility`.                                            | Inherited and symbol-named members; they are outside the own string-keyed record the guard certifies.                 |
+| `isPremise`                       | function | open    | Optional `field`, `label`, `description`, `comparison`, and `met` members when defined.                                            | `expected`, `actual`, and unknown members; the first two are published as `unknown`, and open results admit the rest. |
+| `isFinding`                       | function | open    | Every published member, including optional strings and each nested `Premise`.                                                      | Unknown members; a foreign result implementation may add them without changing the published contract.                |
+| `isDerivation`                    | function | open    | Every published member; `value` accepts every JavaScript `number`, and trace/errors are strings.                                   | Unknown members; a foreign result implementation may add them without changing the published contract.                |
+| `isQualificationResult`           | function | open    | The full result closure: eligibility, scope values, findings, derivations, success, and audit.                                     | Unknown members; a borrowed `QualifierInterface` implementation may add them beyond the published contract.           |
+| `isQualificationValidationResult` | const    | open    | `valid` plus every string in `errors` and `warnings` — reasons' published result guard by delegation, since the type is its alias. | Unknown members; a borrowed `QualifierInterface` implementation may add them beyond the published contract.           |
+| `isRuling`                        | function | exact   | Every authored `Ruling` member and the complete key set.                                                                           | Nothing; this package owns the authored input record.                                                                 |
+| `isQualificationPass`             | function | exact   | Either complete reason quantitative-definition or logical-definition shape.                                                        | Nothing; the reason package owns both authored input shapes.                                                          |
+| `isQualificationDefinition`       | function | exact   | Every authored definition member, nested pass/ruling shapes, and the complete key set.                                             | Nothing; this package owns the authored input record.                                                                 |
 
 ```ts
 import {
 	isEligibility,
+	isEligibilityRecord,
+	isFinding,
+	isDerivation,
+	isPremise,
 	isQualificationDefinition,
 	isQualificationEffect,
 	isQualificationPass,
+	isQualificationResult,
+	isQualificationValidationResult,
 	isRuling,
 } from '@orkestrel/qualifier'
 import { logicalDefinition } from '@orkestrel/reason'
 
 isEligibility('referral') // true
 isQualificationEffect('condition') // true
+isEligibilityRecord({ wind: 'ineligible' }) // true
+isPremise({ field: 'age', comparison: 'above', actual: 30, met: true }) // true
+isFinding({
+	id: 'f',
+	pass: 'gates',
+	rule: 'adult',
+	effect: 'condition',
+	applied: true,
+	premises: [],
+}) // true
+isDerivation({ id: 'cap', value: Number.NaN, success: true, trace: [], errors: [] }) // true
+isQualificationResult({
+	id: 'd',
+	name: 'D',
+	eligibility: 'eligible',
+	scopes: {},
+	findings: [],
+	derivations: [],
+	success: true,
+	trace: [],
+	errors: [],
+}) // true
+isQualificationValidationResult({ valid: true, errors: [], warnings: [] }) // true
 isQualificationPass(logicalDefinition('gates', 'Gates', [])) // true
 isRuling({ id: 'r', pass: 'gates', rule: 'licensed', effect: 'restriction' }) // true
 isQualificationDefinition({ id: 'd', name: 'D', passes: [] }) // true
