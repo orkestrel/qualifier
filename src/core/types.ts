@@ -47,7 +47,15 @@ export interface Ruling {
 	readonly message?: string
 }
 
-/** Display-neutral checked evidence. */
+/**
+ * Display-neutral evidence for one condition, in one of two authoring modes.
+ * A CHECKED premise carries `field` and `comparison`; a DESCRIBED premise
+ * carries neither and renders from `description` instead. The checked form
+ * renders only when `field` and `comparison` are BOTH present, and
+ * `description` then goes unused; a premise missing either half of the
+ * checked pair renders as described instead. `met` is three-state: `true`
+ * (met), `false` (not met), or absent (not evaluated, rendered as unknown).
+ */
 export interface Premise {
 	readonly field?: FieldPath
 	readonly label?: string

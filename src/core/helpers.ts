@@ -143,6 +143,11 @@ export function describeValue(value: unknown): string {
 /**
  * Render one {@link Premise} into a display-neutral sentence.
  *
+ * @remarks
+ * The checked form renders only when `field` and `comparison` are BOTH
+ * present, and `description` then goes unused; a premise missing either half
+ * of the checked pair renders as described instead.
+ *
  * @param entry - The premise to render
  * @param labels - Optional field-to-label overrides, keyed by dot-joined field
  * @returns A display-neutral sentence
@@ -153,6 +158,9 @@ export function describeValue(value: unknown): string {
  *
  * describePremise({ field: 'age', comparison: 'above', expected: 18, actual: 25, met: true })
  * // 'age is more than 18 → met'
+ *
+ * describePremise({ description: 'Applicant is enrolled', met: true })
+ * // 'Applicant is enrolled → met'
  * ```
  */
 export function describePremise(entry: Premise, labels?: Readonly<Record<string, string>>): string {

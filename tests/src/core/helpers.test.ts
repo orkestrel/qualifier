@@ -204,6 +204,39 @@ describe('helpers', () => {
 			})
 			expect(sentence).toBe('age is more than 18 → not met')
 		})
+
+		it('renders a described premise with met absent as unknown', () => {
+			expect(describePremise({ description: 'Applicant is enrolled' })).toBe(
+				'Applicant is enrolled → unknown',
+			)
+		})
+
+		it('renders a described premise with met false as not met', () => {
+			expect(describePremise({ description: 'Applicant is enrolled', met: false })).toBe(
+				'Applicant is enrolled → not met',
+			)
+		})
+
+		it('renders the checked form when field, comparison, and description are all present, description unused', () => {
+			const sentence = describePremise({
+				field: 'age',
+				comparison: 'above',
+				expected: 18,
+				actual: 25,
+				met: true,
+				description: 'Applicant is enrolled',
+			})
+			expect(sentence).toBe('age is more than 18 → met')
+		})
+
+		it('renders the described form when field is present without comparison, field name unused', () => {
+			const sentence = describePremise({
+				field: 'age',
+				description: 'Applicant is enrolled',
+				met: true,
+			})
+			expect(sentence).toBe('Applicant is enrolled → met')
+		})
 	})
 
 	describe('findRule', () => {

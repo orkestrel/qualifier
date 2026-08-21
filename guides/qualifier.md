@@ -63,26 +63,26 @@ per subject.
 
 ### Types
 
-| Type                            | Kind      | Shape                                                                                                                              |
-| ------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `Eligibility`                   | type      | `'eligible' \| 'ineligible' \| 'referral'` — the eligibility outcome axis.                                                         |
-| `QualificationEffect`           | type      | `'restriction' \| 'referral' \| 'condition'` — an authored ruling's eligibility impact.                                            |
-| `QualificationPass`             | type      | `QuantitativeDefinition \| LogicalDefinition` — one ordered derivation or rule pass.                                               |
-| `QualificationProjection`       | type      | `number \| boolean \| Readonly<Record<string, unknown>>` — one pass's internal working projection.                                 |
-| `QualificationContext`          | type      | `Readonly<Record<string, QualificationProjection>>` — the internal projection record stored under `QUALIFICATION_KEY`.             |
-| `RulingInput`                   | interface | `{ scope?, message? }` — optional fields accepted by `rulingDefinition`.                                                           |
-| `QualificationInput`            | interface | `{ description?, rulings?, metadata? }` — optional fields accepted by `qualificationDefinition`.                                   |
-| `Ruling`                        | interface | `{ id, pass, rule, effect, scope?, message? }` — an authored consequence for one rule in one logical pass.                         |
-| `Premise`                       | interface | `{ field?, label?, description?, comparison?, expected?, actual?, met? }` — display-neutral checked evidence.                      |
-| `Finding`                       | interface | `{ id, pass, rule, effect, scope?, applied, message?, premises }` — one resolved ruling.                                           |
-| `Derivation`                    | interface | `{ id, value, success, trace, errors }` — one quantitative pass's audit result.                                                    |
-| `QualificationDefinition`       | interface | `{ id, name, description?, passes, rulings?, metadata? }` — a pure authored qualification definition.                              |
-| `QualificationResult`           | interface | `{ id, name, eligibility, scopes, findings, derivations, success, trace, errors }` — one subject's complete qualification outcome. |
-| `QualificationValidationResult` | type      | `{ valid, errors, warnings }` — semantic definition validation.                                                                    |
-| `QualifierErrorCode`            | type      | `'DEFINITION' \| 'MISMATCH' \| 'DESTROYED' \| 'ENGINE'` — programmer-error codes.                                                  |
-| `QualifierEventMap`             | type      | `derive(derivation)` · `finding(finding)` · `qualify(result)` · `destroy()`.                                                       |
-| `QualifierOptions`              | interface | `{ engine?, validate?, labels?, on?, error? }` — input to `createQualifier`.                                                       |
-| `QualifierInterface`            | interface | `emitter` + `qualify` (one subject) + `validate` + `destroy`.                                                                      |
+| Type                            | Kind      | Shape                                                                                                                                                                                                             |
+| ------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Eligibility`                   | type      | `'eligible' \| 'ineligible' \| 'referral'` — the eligibility outcome axis.                                                                                                                                        |
+| `QualificationEffect`           | type      | `'restriction' \| 'referral' \| 'condition'` — an authored ruling's eligibility impact.                                                                                                                           |
+| `QualificationPass`             | type      | `QuantitativeDefinition \| LogicalDefinition` — one ordered derivation or rule pass.                                                                                                                              |
+| `QualificationProjection`       | type      | `number \| boolean \| Readonly<Record<string, unknown>>` — one pass's internal working projection.                                                                                                                |
+| `QualificationContext`          | type      | `Readonly<Record<string, QualificationProjection>>` — the internal projection record stored under `QUALIFICATION_KEY`.                                                                                            |
+| `RulingInput`                   | interface | `{ scope?, message? }` — optional fields accepted by `rulingDefinition`.                                                                                                                                          |
+| `QualificationInput`            | interface | `{ description?, rulings?, metadata? }` — optional fields accepted by `qualificationDefinition`.                                                                                                                  |
+| `Ruling`                        | interface | `{ id, pass, rule, effect, scope?, message? }` — an authored consequence for one rule in one logical pass.                                                                                                        |
+| `Premise`                       | interface | `{ field?, label?, description?, comparison?, expected?, actual?, met? }` — display-neutral evidence, checked when `field` and `comparison` are both present (then `description` is unused), described otherwise. |
+| `Finding`                       | interface | `{ id, pass, rule, effect, scope?, applied, message?, premises }` — one resolved ruling.                                                                                                                          |
+| `Derivation`                    | interface | `{ id, value, success, trace, errors }` — one quantitative pass's audit result.                                                                                                                                   |
+| `QualificationDefinition`       | interface | `{ id, name, description?, passes, rulings?, metadata? }` — a pure authored qualification definition.                                                                                                             |
+| `QualificationResult`           | interface | `{ id, name, eligibility, scopes, findings, derivations, success, trace, errors }` — one subject's complete qualification outcome.                                                                                |
+| `QualificationValidationResult` | type      | `{ valid, errors, warnings }` — semantic definition validation.                                                                                                                                                   |
+| `QualifierErrorCode`            | type      | `'DEFINITION' \| 'MISMATCH' \| 'DESTROYED' \| 'ENGINE'` — programmer-error codes.                                                                                                                                 |
+| `QualifierEventMap`             | type      | `derive(derivation)` · `finding(finding)` · `qualify(result)` · `destroy()`.                                                                                                                                      |
+| `QualifierOptions`              | interface | `{ engine?, validate?, labels?, on?, error? }` — input to `createQualifier`.                                                                                                                                      |
+| `QualifierInterface`            | interface | `emitter` + `qualify` (one subject) + `validate` + `destroy`.                                                                                                                                                     |
 
 Every public data member is `readonly`, every optional key is omitted rather than
 `undefined`, and each name is single-word within its entity (AGENTS §4.1). Reason
