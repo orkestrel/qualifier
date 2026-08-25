@@ -36,12 +36,18 @@ export function buildDeepRecord(depth: number): Record<string, unknown> {
 	return current
 }
 
-/** Build a null-prototype record carrying hostile keys for guard tests. */
+/** Build a null-prototype record carrying an own `__proto__` key for guard tests. */
 export function buildHostileRecord(): Record<string, unknown> {
-	return Object.assign(Object.create(null), {
-		id: 'hostile',
-		__proto__: { polluted: true },
+	const record: Record<string, unknown> = Object.assign(Object.create(null), { id: 'hostile' })
+	// An object-literal `__proto__:` key sets the prototype instead of creating an own key, so this
+	// record needs `defineProperty` to carry a genuine own `__proto__` entry.
+	Object.defineProperty(record, '__proto__', {
+		value: { polluted: true },
+		enumerable: true,
+		writable: true,
+		configurable: true,
 	})
+	return record
 }
 
 /** Licensed-gate logical pass with an unscoped restriction ruling. */
@@ -193,10 +199,4 @@ export function createFailingEngine(): ReasonInterface {
 		validate: () => ({ valid: true, errors: [], warnings: [] }),
 		destroy: () => {},
 	}
-}
-
-/** Whether a repository-relative Vue SFC path belongs to the private browser application. */
-export function isBrowserVuePath(path: string): boolean {
-	const normalized = path.replaceAll('\\', '/')
-	return normalized.startsWith('app/browser/')
 }

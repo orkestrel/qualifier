@@ -20,9 +20,6 @@ const PLACEHOLDER = /\{\{([^{}]+)\}\}/g
 /** The nesting depth `tests/src/core/validators.test.ts` drives the guards with. */
 const GUARD_DEPTH = 200
 
-/** A repository-relative Vue path, spelled as segments so no case carries a hand-written string. */
-const BROWSER_SEGMENTS: readonly string[] = Object.freeze(['app', 'browser', 'panel', 'Panel.vue'])
-
 /** Whether a value is a record this proof can walk. */
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 	return typeof value === 'object' && value !== null
@@ -243,6 +240,14 @@ describe('adversarial records', () => {
 		// The builder's `__proto__` literal must stay inert rather than reaching every other suite.
 		expect(Object.hasOwn(Object.prototype, 'polluted')).toBe(false)
 	})
+
+	it('carries an own `__proto__` key so a guard walking own properties meets it', () => {
+		const record = setup.buildHostileRecord()
+
+		// A genuinely hostile record carries `__proto__` as an own key, not as a prototype swap.
+		expect(Object.getOwnPropertyNames(record)).toContain('__proto__')
+		expect(Object.getPrototypeOf(record)).toBeNull()
+	})
 })
 
 describe('qualification fixtures', () => {
@@ -317,21 +322,5 @@ describe('failing engine', () => {
 		engine.register(createQuantitativeReasoner())
 		expect(engine.reasoners()).toEqual([])
 		expect(engine.reasoner('quantitative')).toBeUndefined()
-	})
-})
-
-describe('isBrowserVuePath', () => {
-	it('accepts a browser Vue path spelled with a forward slash or a backslash', () => {
-		expect(setup.isBrowserVuePath(BROWSER_SEGMENTS.join('/'))).toBe(true)
-		expect(setup.isBrowserVuePath(BROWSER_SEGMENTS.join('\\'))).toBe(true)
-	})
-
-	it('refuses a sibling environment and a prefix lookalike', () => {
-		const [, ...tail] = BROWSER_SEGMENTS
-
-		expect(setup.isBrowserVuePath(['app', 'core', ...tail.slice(1)].join('/'))).toBe(false)
-		expect(setup.isBrowserVuePath(['src', 'browser', ...tail.slice(1)].join('/'))).toBe(false)
-		expect(setup.isBrowserVuePath(['app', 'browserless', ...tail.slice(1)].join('/'))).toBe(false)
-		expect(setup.isBrowserVuePath(['vendor', ...BROWSER_SEGMENTS].join('/'))).toBe(false)
 	})
 })
