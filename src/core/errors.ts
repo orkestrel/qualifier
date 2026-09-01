@@ -22,7 +22,12 @@ export class QualifierError extends Error {
 	}
 }
 
-/** Narrow a caught value to a {@link QualifierError}. */
+/**
+ * Narrow a caught value to a {@link QualifierError}.
+ *
+ * @param value - The caught value to test
+ * @returns True if `value` is a {@link QualifierError} instance; false otherwise
+ */
 export function isQualifierError(value: unknown): value is QualifierError {
 	return value instanceof QualifierError
 }

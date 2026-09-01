@@ -486,7 +486,10 @@ export function rulingToFinding(
  * deriveFindingEligibility([finding]) // 'ineligible'
  * ```
  */
-export function deriveFindingEligibility(findings: Finding[], failed = false): Eligibility {
+export function deriveFindingEligibility(
+	findings: readonly Finding[],
+	failed = false,
+): Eligibility {
 	const eligibilities = findings
 		.filter((finding) => finding.applied && finding.scope === undefined)
 		.map((finding) => EFFECT_ELIGIBILITIES[finding.effect])
@@ -507,7 +510,7 @@ export function deriveFindingEligibility(findings: Finding[], failed = false): E
  * combineEligibilities(['eligible', 'referral']) // 'referral'
  * ```
  */
-export function combineEligibilities(eligibilities: Eligibility[]): Eligibility {
+export function combineEligibilities(eligibilities: readonly Eligibility[]): Eligibility {
 	for (const eligibility of ELIGIBILITY_PRECEDENCE) {
 		if (eligibilities.includes(eligibility)) return eligibility
 	}
@@ -534,7 +537,7 @@ export function combineEligibilities(eligibilities: Eligibility[]): Eligibility 
  * ```
  */
 export function deriveScopeEligibilities(
-	findings: Finding[],
+	findings: readonly Finding[],
 ): Readonly<Record<string, Eligibility>> {
 	const grouped: Record<string, Eligibility[]> = {}
 	for (const finding of findings) {
@@ -812,7 +815,7 @@ export function findUnreadDerivations(definition: QualificationDefinition): read
 export function qualificationDefinition(
 	id: string,
 	name: string,
-	passes: QualificationPass[],
+	passes: readonly QualificationPass[],
 	input?: QualificationInput,
 ): QualificationDefinition {
 	return {

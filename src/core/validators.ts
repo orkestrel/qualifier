@@ -29,10 +29,20 @@ import {
 	isReasonValidationResult,
 } from '@orkestrel/reason'
 
-/** Determine whether a value is an {@link Eligibility} literal. */
+/**
+ * Determine whether a value is an {@link Eligibility} literal.
+ *
+ * @param value - The value to test
+ * @returns True if `value` is one of the eligibility literals; false otherwise
+ */
 export const isEligibility = literalOf('eligible', 'ineligible', 'referral')
 
-/** Determine whether a value is a {@link QualificationEffect} literal. */
+/**
+ * Determine whether a value is a {@link QualificationEffect} literal.
+ *
+ * @param value - The value to test
+ * @returns True if `value` is one of the effect literals; false otherwise
+ */
 export const isQualificationEffect = literalOf('restriction', 'referral', 'condition')
 
 /**
@@ -162,12 +172,22 @@ export function isQualificationResult(value: unknown): value is QualificationRes
 export const isQualificationValidationResult: Guard<QualificationValidationResult> =
 	isReasonValidationResult
 
-/** Determine whether a value is a {@link QualificationPass} (a quantitative or logical definition). */
+/**
+ * Determine whether a value is a {@link QualificationPass} (a quantitative or logical definition).
+ *
+ * @param value - The value to test
+ * @returns True if `value` is a complete reason quantitative or logical definition; false otherwise
+ */
 export function isQualificationPass(value: unknown): value is QualificationPass {
 	return isQuantitativeDefinition(value) || isLogicalDefinition(value)
 }
 
-/** Determine whether a value is an exact {@link Ruling} record. */
+/**
+ * Determine whether a value is an exact {@link Ruling} record.
+ *
+ * @param value - The value to test
+ * @returns True if `value` carries every ruling member and no unknown key; false otherwise
+ */
 export function isRuling(value: unknown): value is Ruling {
 	return recordOf(
 		{
@@ -182,7 +202,12 @@ export function isRuling(value: unknown): value is Ruling {
 	)(value)
 }
 
-/** Determine whether a value is an exact {@link QualificationDefinition} record. */
+/**
+ * Determine whether a value is an exact {@link QualificationDefinition} record.
+ *
+ * @param value - The value to test
+ * @returns True if `value` carries every definition member and no unknown key; false otherwise
+ */
 export function isQualificationDefinition(value: unknown): value is QualificationDefinition {
 	return recordOf(
 		{

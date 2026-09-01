@@ -76,10 +76,61 @@ export class Qualifier implements QualifierInterface {
 		this.#labels = options?.labels
 	}
 
+	/**
+	 * The typed observation surface carrying `derive`, `finding`, `qualify`, and
+	 * `destroy`.
+	 *
+	 * @returns The emitter this qualifier owns
+	 *
+	 * @example
+	 * ```ts
+	 * import { Qualifier } from '@orkestrel/qualifier'
+	 *
+	 * const qualifier = new Qualifier()
+	 * qualifier.emitter.on('qualify', (result) => console.log(result.eligibility))
+	 * qualifier.destroy()
+	 * ```
+	 */
 	get emitter(): EmitterInterface<QualifierEventMap> {
 		return this.#emitter
 	}
 
+	/**
+	 * Qualifies one subject against one authored definition.
+	 *
+	 * @remarks
+	 * Semantic validation runs first when the `validate` option is on, so an invalid
+	 * definition throws before any pass runs. Passes run in authored order over a
+	 * copy-on-write working subject, and the caller's `subject` is never mutated. An
+	 * unscoped restriction stops the remaining passes because no later finding can be
+	 * more severe.
+	 *
+	 * @param subject - The record to qualify
+	 * @param definition - The authored qualification definition
+	 * @returns A fresh, frozen qualification result
+	 * @throws {@link QualifierError} `'DEFINITION'` when validation is enabled and the
+	 * definition fails semantic validation, or when the engine rejects a pass as an invalid
+	 * definition; `'MISMATCH'` when the subject is not a record or already carries the
+	 * reserved `qualification` key; `'DESTROYED'` after `destroy`, or when the engine
+	 * reports itself destroyed mid-pass; `'ENGINE'` for every other engine throw
+	 *
+	 * @example
+	 * ```ts
+	 * import { qualificationDefinition, Qualifier, rulingDefinition } from '@orkestrel/qualifier'
+	 * import { atom, logicalDefinition, rule } from '@orkestrel/reason'
+	 *
+	 * const gates = logicalDefinition('gates', 'Eligibility gates', [
+	 *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+	 * ])
+	 * const definition = qualificationDefinition('standard', 'Standard eligibility', [gates], {
+	 *   rulings: [rulingDefinition('license', 'gates', 'licensed', 'restriction')],
+	 * })
+	 *
+	 * const qualifier = new Qualifier()
+	 * qualifier.qualify({ id: 'risk-1', licensed: false }, definition).eligibility // 'ineligible'
+	 * qualifier.destroy()
+	 * ```
+	 */
 	qualify(subject: Subject, definition: QualificationDefinition): QualificationResult {
 		this.#alive()
 		if (this.#validate) {
@@ -95,6 +146,30 @@ export class Qualifier implements QualifierInterface {
 		return this.#qualify(subject, definition)
 	}
 
+	/**
+	 * Validates one authored definition semantically, without running it.
+	 *
+	 * @remarks
+	 * Structural shape is `isQualificationDefinition`'s job. This checks the meaning:
+	 * non-empty id and name, valid and uniquely identified passes and rulings, every
+	 * ruling reference resolving to a logical pass and one of its rules, and no pass id
+	 * shadowing `QUALIFICATION_KEY`. An empty definition, a logical pass carrying no
+	 * ruling, and a derivation no later pass reads are warnings rather than errors.
+	 *
+	 * @param definition - The authored qualification definition
+	 * @returns A fresh validation result carrying `valid`, `errors`, and `warnings`
+	 * @throws {@link QualifierError} `'DESTROYED'` after `destroy`
+	 *
+	 * @example
+	 * ```ts
+	 * import { qualificationDefinition, Qualifier } from '@orkestrel/qualifier'
+	 *
+	 * const qualifier = new Qualifier()
+	 * qualifier.validate(qualificationDefinition('empty', 'Empty', []))
+	 * // { valid: true, errors: [], warnings: ['Definition has no passes'] }
+	 * qualifier.destroy()
+	 * ```
+	 */
 	validate(definition: QualificationDefinition): QualificationValidationResult {
 		this.#alive()
 		const errors: string[] = []
@@ -120,6 +195,23 @@ export class Qualifier implements QualifierInterface {
 		return { valid: errors.length === 0, errors, warnings }
 	}
 
+	/**
+	 * Destroys this qualifier, idempotently.
+	 *
+	 * @remarks
+	 * An engine this qualifier created is destroyed; an injected engine stays
+	 * caller-owned and is left alone. The `destroy` event fires before the emitter
+	 * itself is destroyed, and a later call returns without re-emitting.
+	 *
+	 * @example
+	 * ```ts
+	 * import { Qualifier } from '@orkestrel/qualifier'
+	 *
+	 * const qualifier = new Qualifier()
+	 * qualifier.destroy()
+	 * qualifier.destroy() // idempotent
+	 * ```
+	 */
 	destroy(): void {
 		if (this.#destroyed) return
 		if (this.#owned) this.#engine.destroy()
