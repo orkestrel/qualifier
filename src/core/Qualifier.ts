@@ -43,8 +43,7 @@ import {
 } from '@orkestrel/reason'
 
 /**
- * A qualifier — runs ordered passes over one reason engine and returns
- * eligibility.
+ * Runs ordered passes over one reason engine and returns eligibility.
  *
  * @remarks
  * The engine is OWNED when self-created (destroyed on `destroy()`) and borrowed
@@ -82,7 +81,7 @@ export class Qualifier implements QualifierInterface {
 	}
 
 	/**
-	 * The typed observation surface carrying `derive`, `finding`, `qualify`, and
+	 * Holds the typed observation surface carrying `derive`, `finding`, `qualify`, and
 	 * `destroy`.
 	 *
 	 * @returns The emitter this qualifier owns

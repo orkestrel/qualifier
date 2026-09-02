@@ -35,7 +35,7 @@ import {
 } from '@orkestrel/reason'
 
 /**
- * Interpolate `{{dotted.path}}` tokens in a message template against a subject.
+ * Interpolates `{{dotted.path}}` tokens in a message template against a subject.
  *
  * @remarks
  * Each token is split on `.` into a `FieldPath` array and resolved with
@@ -69,7 +69,7 @@ export function interpolateMessage(
 }
 
 /**
- * Describe a {@link Premise} comparison as a display-neutral verb phrase.
+ * Describes a {@link Premise} comparison as a display-neutral verb phrase.
  *
  * @param comparison - The comparison to describe
  * @returns A display-neutral phrase
@@ -107,7 +107,7 @@ export function describeComparison(comparison: NonNullable<Premise['comparison']
 }
 
 /**
- * Render a structured or scalar expected value display-neutrally.
+ * Renders a structured or scalar expected value display-neutrally.
  *
  * @remarks
  * An array renders as its elements, each `String`-coerced, joined with `', '`.
@@ -141,7 +141,7 @@ export function describeValue(value: unknown): string {
 }
 
 /**
- * Render one {@link Premise} into a display-neutral sentence.
+ * Renders one {@link Premise} into a display-neutral sentence.
  *
  * @remarks
  * The checked form renders only when `field` and `comparison` are BOTH
@@ -175,7 +175,7 @@ export function describePremise(entry: Premise, labels?: Readonly<Record<string,
 }
 
 /**
- * Build a {@link Premise} from an authored {@link Check} and its evaluated
+ * Builds a {@link Premise} from an authored {@link Check} and its evaluated
  * `CheckResult`.
  *
  * @param check - The authored check
@@ -210,7 +210,7 @@ export function premiseCheck(
 }
 
 /**
- * Build rich premises for one fired {@link Rule} by walking its premise atoms
+ * Builds rich premises for one fired {@link Rule} by walking its premise atoms
  * and re-evaluating each against the working subject.
  *
  * @remarks
@@ -264,7 +264,7 @@ export function logicalPremises(
 }
 
 /**
- * Locate an authored {@link Rule} by id.
+ * Locates an authored {@link Rule} by id.
  *
  * @param definition - The logical definition to search
  * @param id - The rule id
@@ -287,7 +287,7 @@ export function findRule(definition: LogicalDefinition, id: string): Rule | unde
 }
 
 /**
- * Project one reason result into the internal qualification namespace.
+ * Projects one reason result into the internal qualification namespace.
  *
  * @remarks
  * A quantitative result contributes its numeric `value`. A logical result
@@ -339,7 +339,7 @@ export function reasonResultToProjection(
 }
 
 /**
- * Project a quantitative result into a {@link Derivation} audit record.
+ * Projects a quantitative result into a {@link Derivation} audit record.
  *
  * @param id - The pass id
  * @param result - The evaluated quantitative result
@@ -365,7 +365,7 @@ export function quantitativeResultToDerivation(id: string, result: QuantitativeR
 }
 
 /**
- * Wrap a {@link QualificationContext} under {@link QUALIFICATION_KEY}.
+ * Wraps a {@link QualificationContext} under {@link QUALIFICATION_KEY}.
  *
  * @param context - The accumulated projection context
  * @returns A record carrying the context under the reserved key
@@ -384,7 +384,7 @@ export function qualificationToRecord(
 }
 
 /**
- * Copy-on-write merge one pass projection into the context.
+ * Merges one pass projection into the context, copy-on-write.
  *
  * @param context - The current projection context
  * @param id - The pass id to project under
@@ -408,7 +408,7 @@ export function mergeQualificationContext(
 }
 
 /**
- * Join a ruling, its logical rule result, the pass, the pre-projection subject,
+ * Joins a ruling, its logical rule result, the pass, the pre-projection subject,
  * and an evaluator into a {@link Finding}.
  *
  * @remarks
@@ -467,7 +467,7 @@ export function rulingToFinding(
 }
 
 /**
- * Derive global eligibility from applied, unscoped findings.
+ * Derives global eligibility from applied, unscoped findings.
  *
  * @remarks
  * Only findings that both applied and carry no `scope` shape global eligibility.
@@ -498,7 +498,7 @@ export function deriveFindingEligibility(
 }
 
 /**
- * Return the most severe {@link Eligibility} in a list.
+ * Returns the most severe {@link Eligibility} in a list.
  *
  * @param eligibilities - The eligibilities to combine
  * @returns The most severe eligibility, or `'eligible'` for an empty list
@@ -518,7 +518,7 @@ export function combineEligibilities(eligibilities: readonly Eligibility[]): Eli
 }
 
 /**
- * Derive one eligibility per finding scope.
+ * Derives one eligibility per finding scope.
  *
  * @remarks
  * Only applied, scoped findings contribute. Each named scope combines its own
@@ -603,10 +603,10 @@ export function describeMissingReferences(definition: QualificationDefinition): 
 }
 
 /**
- * Determine whether a subject already owns the reserved {@link QUALIFICATION_KEY}.
+ * Determines whether a subject already owns the reserved {@link QUALIFICATION_KEY}.
  *
  * @param subject - The subject to check
- * @returns `true` when the subject owns the reserved key
+ * @returns True if the subject owns the reserved key; false otherwise
  *
  * @example
  * ```ts
@@ -620,7 +620,7 @@ export function hasReservedKey(subject: Subject): boolean {
 }
 
 /**
- * Assert a value is a valid qualification {@link Subject}, narrowing it in place.
+ * Asserts a value is a valid qualification {@link Subject}, narrowing it in place.
  *
  * @param value - The candidate subject to validate
  * @throws {@link QualifierError} `'MISMATCH'` when the value is not a record, or
@@ -646,7 +646,7 @@ export function assertSubject(value: unknown): asserts value is Subject {
 }
 
 /**
- * Map an engine throw caught while running one pass to a typed {@link QualifierError}.
+ * Maps an engine throw caught while running one pass to a typed {@link QualifierError}.
  *
  * @remarks
  * A reason `ReasonError('INVALID')` maps to `DEFINITION` (the engine rejected the
@@ -792,7 +792,7 @@ export function describeUnreadDerivations(definition: QualificationDefinition): 
 }
 
 /**
- * Build a {@link QualificationDefinition}.
+ * Builds a {@link QualificationDefinition}.
  *
  * @remarks
  * Returns a fresh top-level definition, omitting absent optional keys;
@@ -829,7 +829,7 @@ export function qualificationDefinition(
 }
 
 /**
- * Build a {@link Ruling} — one authored consequence for one rule in one pass.
+ * Builds a {@link Ruling} — one authored consequence for one rule in one pass.
  *
  * @param id - The ruling id
  * @param pass - The logical pass id the rule lives in

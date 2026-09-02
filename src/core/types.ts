@@ -9,35 +9,35 @@ import type {
 	Subject,
 } from '@orkestrel/reason'
 
-/** The eligibility outcome axis. */
+/** Represents the eligibility outcome axis. */
 export type Eligibility = 'eligible' | 'ineligible' | 'referral'
 
-/** An authored ruling's eligibility impact. */
+/** Represents an authored ruling's eligibility impact. */
 export type QualificationEffect = 'restriction' | 'referral' | 'condition'
 
-/** One ordered derivation or rule pass. */
+/** Represents one ordered derivation or rule pass. */
 export type QualificationPass = QuantitativeDefinition | LogicalDefinition
 
-/** One pass's internal working projection. */
+/** Represents one pass's internal working projection. */
 export type QualificationProjection = number | boolean | Readonly<Record<string, unknown>>
 
-/** The internal projection record stored under `QUALIFICATION_KEY`. */
+/** Represents the internal projection record stored under `QUALIFICATION_KEY`. */
 export type QualificationContext = Readonly<Record<string, QualificationProjection>>
 
-/** Optional fields accepted by `rulingDefinition`. */
+/** Carries the optional fields `rulingDefinition` accepts. */
 export interface RulingInput {
 	readonly scope?: string
 	readonly message?: string
 }
 
-/** Optional fields accepted by `qualificationDefinition`. */
+/** Carries the optional fields `qualificationDefinition` accepts. */
 export interface QualificationInput {
 	readonly description?: string
 	readonly rulings?: readonly Ruling[]
 	readonly metadata?: Readonly<Record<string, JSONValue>>
 }
 
-/** An authored consequence for one rule in one logical pass. */
+/** Represents an authored consequence for one rule in one logical pass. */
 export interface Ruling {
 	readonly id: string
 	readonly pass: string
@@ -48,7 +48,7 @@ export interface Ruling {
 }
 
 /**
- * Display-neutral evidence for one condition, in one of two authoring modes.
+ * Represents display-neutral evidence for one condition, in one of two authoring modes.
  * A CHECKED premise carries `field` and `comparison`; a DESCRIBED premise
  * carries neither and renders from `description` instead. The checked form
  * renders only when `field` and `comparison` are BOTH present, and
@@ -66,7 +66,7 @@ export interface Premise {
 	readonly met?: boolean
 }
 
-/** One resolved ruling. */
+/** Represents one resolved ruling. */
 export interface Finding {
 	readonly id: string
 	readonly pass: string
@@ -78,7 +78,7 @@ export interface Finding {
 	readonly premises: readonly Premise[]
 }
 
-/** One quantitative pass's audit result. */
+/** Represents one quantitative pass's audit result. */
 export interface Derivation {
 	readonly id: string
 	readonly value: number
@@ -87,7 +87,7 @@ export interface Derivation {
 	readonly errors: readonly string[]
 }
 
-/** A pure authored qualification definition. */
+/** Represents a pure authored qualification definition. */
 export interface QualificationDefinition {
 	readonly id: string
 	readonly name: string
@@ -97,7 +97,7 @@ export interface QualificationDefinition {
 	readonly metadata?: Readonly<Record<string, JSONValue>>
 }
 
-/** One subject's complete qualification outcome. */
+/** Represents one subject's complete qualification outcome. */
 export interface QualificationResult {
 	readonly id: string
 	readonly name: string
@@ -110,11 +110,11 @@ export interface QualificationResult {
 	readonly errors: readonly string[]
 }
 
-/** A coded {@link QualifierError} programmer-error code. */
+/** Represents a coded {@link QualifierError} programmer-error code. */
 export type QualifierErrorCode = 'DEFINITION' | 'MISMATCH' | 'DESTROYED' | 'ENGINE'
 
 /**
- * The structured payload a {@link QualifierError} carries.
+ * Represents the structured payload a {@link QualifierError} carries.
  *
  * @remarks
  * `pass` names the pass that was running when the engine threw. `definition` names the
@@ -128,7 +128,7 @@ export interface QualifierErrorContext {
 	readonly cause?: unknown
 }
 
-/** The push observation surface of a {@link QualifierInterface} (AGENTS §13). */
+/** Represents the push observation surface of a {@link QualifierInterface} (AGENTS §13). */
 export type QualifierEventMap = {
 	readonly derive: readonly [derivation: Derivation]
 	readonly finding: readonly [finding: Finding]
@@ -136,7 +136,7 @@ export type QualifierEventMap = {
 	readonly destroy: readonly []
 }
 
-/** Options for `createQualifier` / the `Qualifier` constructor. */
+/** Carries the options for `createQualifier` / the `Qualifier` constructor. */
 export interface QualifierOptions {
 	readonly engine?: ReasonInterface
 	readonly validate?: boolean
@@ -145,9 +145,9 @@ export interface QualifierOptions {
 	readonly error?: EmitterErrorHandler
 }
 
-/** One qualifier — owns or borrows one reason engine and returns eligibility. */
+/** Owns or borrows one reason engine and returns eligibility. */
 export interface QualifierInterface {
-	/** The typed observation surface carrying `derive`, `finding`, `qualify`, and `destroy`. */
+	/** Holds the typed observation surface carrying `derive`, `finding`, `qualify`, and `destroy`. */
 	readonly emitter: EmitterInterface<QualifierEventMap>
 	/**
 	 * Qualifies one subject against one authored definition.

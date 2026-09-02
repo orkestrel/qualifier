@@ -2,7 +2,7 @@ import type { QualifierInterface, QualifierOptions } from './types.js'
 import { Qualifier } from './Qualifier.js'
 
 /**
- * Create one qualifier over a reason engine.
+ * Creates one qualifier over a reason engine.
  *
  * @remarks
  * A standalone qualifier creates and OWNS one shared quantitative-plus-logical

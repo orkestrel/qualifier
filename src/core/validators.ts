@@ -27,7 +27,7 @@ import {
 } from '@orkestrel/reason'
 
 /**
- * Determine whether a value is an {@link Eligibility} literal.
+ * Determines whether a value is an {@link Eligibility} literal.
  *
  * @param value - The value to test
  * @returns True if `value` is one of the eligibility literals; false otherwise
@@ -35,7 +35,7 @@ import {
 export const isEligibility = literalOf('eligible', 'ineligible', 'referral')
 
 /**
- * Determine whether a value is a {@link QualificationEffect} literal.
+ * Determines whether a value is a {@link QualificationEffect} literal.
  *
  * @param value - The value to test
  * @returns True if `value` is one of the effect literals; false otherwise
@@ -43,14 +43,15 @@ export const isEligibility = literalOf('eligible', 'ineligible', 'referral')
 export const isQualificationEffect = literalOf('restriction', 'referral', 'condition')
 
 /**
- * Determine whether a value is an open string-keyed record of {@link Eligibility} values.
+ * Determines whether a value is an open string-keyed record of {@link Eligibility} values.
  *
  * @remarks
  * Every own string-named property is checked, including non-enumerable properties. Inherited and
  * symbol-named members are left unchecked because they are outside the record this guard certifies.
  *
  * @param value - The value to test
- * @returns `true` when `value` is a non-array object whose own string-named values are eligibilities
+ * @returns True if `value` is a non-array object whose own string-named values are
+ * eligibilities; false otherwise
  */
 export function isEligibilityRecord(
 	value: unknown,
@@ -61,7 +62,7 @@ export function isEligibilityRecord(
 }
 
 /**
- * Determine whether a value is an open result-side {@link Premise}.
+ * Determines whether a value is an open result-side {@link Premise}.
  *
  * @remarks
  * `expected` is unchecked and may be absent or contain any value because its published type is
@@ -69,7 +70,7 @@ export function isEligibilityRecord(
  * Unknown members are admitted.
  *
  * @param value - The value to test
- * @returns `true` when every checked premise member follows its published type
+ * @returns True if every checked premise member follows its published type; false otherwise
  */
 export function isPremise(value: unknown): value is Premise {
 	return objectOf(
@@ -85,14 +86,14 @@ export function isPremise(value: unknown): value is Premise {
 }
 
 /**
- * Determine whether a value is an open result-side {@link Finding}.
+ * Determines whether a value is an open result-side {@link Finding}.
  *
  * @remarks
  * Unknown members are admitted. Optional `scope` and `message` members may be absent or
  * `undefined`; a present defined value must be a string.
  *
  * @param value - The value to test
- * @returns `true` when every published finding member is valid
+ * @returns True if every published finding member is valid; false otherwise
  */
 export function isFinding(value: unknown): value is Finding {
 	return objectOf(
@@ -111,14 +112,14 @@ export function isFinding(value: unknown): value is Finding {
 }
 
 /**
- * Determine whether a value is an open result-side {@link Derivation}.
+ * Determines whether a value is an open result-side {@link Derivation}.
  *
  * @remarks
  * Unknown members are admitted. `value` follows the published `number` type, including `NaN` and
  * infinities.
  *
  * @param value - The value to test
- * @returns `true` when every published derivation member is valid
+ * @returns True if every published derivation member is valid; false otherwise
  */
 export function isDerivation(value: unknown): value is Derivation {
 	return objectOf({
@@ -131,14 +132,14 @@ export function isDerivation(value: unknown): value is Derivation {
 }
 
 /**
- * Determine whether a value is an open {@link QualificationResult} returned by a qualifier.
+ * Determines whether a value is an open {@link QualificationResult} returned by a qualifier.
  *
  * @remarks
  * This guard is result-postured for values returned through a borrowed qualifier interface. It
  * admits unknown members and class instances while checking the complete published result closure.
  *
  * @param value - The value to test
- * @returns `true` when every published qualification-result member is valid
+ * @returns True if every published qualification-result member is valid; false otherwise
  */
 export function isQualificationResult(value: unknown): value is QualificationResult {
 	return objectOf({
@@ -155,7 +156,7 @@ export function isQualificationResult(value: unknown): value is QualificationRes
 }
 
 /**
- * Determine whether a value is a {@link QualificationPass} (a quantitative or logical definition).
+ * Determines whether a value is a {@link QualificationPass} (a quantitative or logical definition).
  *
  * @param value - The value to test
  * @returns True if `value` is a complete reason quantitative or logical definition; false otherwise
@@ -165,7 +166,7 @@ export function isQualificationPass(value: unknown): value is QualificationPass 
 }
 
 /**
- * Determine whether a value is an exact {@link Ruling} record.
+ * Determines whether a value is an exact {@link Ruling} record.
  *
  * @param value - The value to test
  * @returns True if `value` carries every ruling member and no unknown key; false otherwise
@@ -185,7 +186,7 @@ export function isRuling(value: unknown): value is Ruling {
 }
 
 /**
- * Determine whether a value is an exact {@link QualificationDefinition} record.
+ * Determines whether a value is an exact {@link QualificationDefinition} record.
  *
  * @param value - The value to test
  * @returns True if `value` carries every definition member and no unknown key; false otherwise

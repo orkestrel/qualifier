@@ -1,7 +1,7 @@
 import type { QualifierErrorCode, QualifierErrorContext } from './types.js'
 
 /**
- * A coded programmer error thrown by the qualifier layer.
+ * Represents a coded programmer error thrown by the qualifier layer.
  *
  * @remarks
  * `DEFINITION` — a qualification definition failed semantic validation; when
@@ -28,7 +28,7 @@ export class QualifierError extends Error {
 }
 
 /**
- * Narrow a caught value to a {@link QualifierError}.
+ * Narrows a caught value to a {@link QualifierError}.
  *
  * @param value - The caught value to test
  * @returns True if `value` is a {@link QualifierError} instance; false otherwise
