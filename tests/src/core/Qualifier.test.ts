@@ -20,6 +20,7 @@ import {
 	createRule,
 	createStaticFactor,
 	createTransform,
+	isReasonValidationResult,
 } from '@orkestrel/reason'
 import { createRecorder } from '@orkestrel/test'
 import {
@@ -706,6 +707,7 @@ describe('Qualifier', () => {
 			const validation = qualifier.validate(buildGatesDefinition())
 
 			expect(validation).toEqual({ valid: true, errors: [], warnings: [] })
+			expect(isReasonValidationResult(validation)).toBe(true)
 
 			qualifier.destroy()
 		})
