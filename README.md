@@ -59,7 +59,7 @@ overload. Every `qualify` call fires once through `qualifier.emitter` (`qualify`
 
 For the full surface — `Qualifier`, `QualificationResult`, finding types, validators,
 factories, errors, and options — see
-[`guides/src/qualifier.md`](guides/src/qualifier.md).
+[`guides/qualifier.md`](guides/qualifier.md).
 
 ## Package
 
