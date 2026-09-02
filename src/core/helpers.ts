@@ -186,9 +186,9 @@ export function describePremise(entry: Premise, labels?: Readonly<Record<string,
  * @example
  * ```ts
  * import { premiseCheck } from '@orkestrel/qualifier'
- * import { check } from '@orkestrel/reason'
+ * import { createCheck } from '@orkestrel/reason'
  *
- * const authored = check('age', 'above', 18)
+ * const authored = createCheck('age', 'above', 18)
  * premiseCheck(authored, { field: 'age', actual: 25, met: true })
  * // { field: 'age', comparison: 'above', expected: 18, actual: 25, met: true }
  * ```
@@ -229,10 +229,10 @@ export function premiseCheck(
  * @example
  * ```ts
  * import { logicalPremises } from '@orkestrel/qualifier'
- * import { atom, createEvaluator, logicalDefinition, rule } from '@orkestrel/reason'
+ * import { createAtom, createEvaluator, createLogicalDefinition, createRule } from '@orkestrel/reason'
  *
- * const gates = logicalDefinition('gates', 'Gates', [
- *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+ * const gates = createLogicalDefinition('gates', 'Gates', [
+ *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
  * ])
  * const evaluator = createEvaluator()
  * const premises = logicalPremises(gates.rules[0], { licensed: false }, evaluator)
@@ -273,10 +273,10 @@ export function logicalPremises(
  * @example
  * ```ts
  * import { findRule } from '@orkestrel/qualifier'
- * import { atom, logicalDefinition, rule } from '@orkestrel/reason'
+ * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
  *
- * const gates = logicalDefinition('gates', 'Gates', [
- *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+ * const gates = createLogicalDefinition('gates', 'Gates', [
+ *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
  * ])
  *
  * findRule(gates, 'licensed')?.id // 'licensed'
@@ -302,10 +302,10 @@ export function findRule(definition: LogicalDefinition, id: string): Rule | unde
  * @example
  * ```ts
  * import { reasonResultToProjection } from '@orkestrel/qualifier'
- * import { factorGroup, quantitativeDefinition, staticFactor } from '@orkestrel/reason'
+ * import { createFactorGroup, createQuantitativeDefinition, createStaticFactor } from '@orkestrel/reason'
  *
- * const cap = quantitativeDefinition('cap', 'TIV cap', [
- *   factorGroup('limit', 'sum', [staticFactor('base', 500_000)]),
+ * const cap = createQuantitativeDefinition('cap', 'TIV cap', [
+ *   createFactorGroup('limit', 'sum', [createStaticFactor('base', 500_000)]),
  * ])
  * const result = {
  *   reasoning: 'quantitative' as const,
@@ -428,10 +428,10 @@ export function mergeQualificationContext(
  * @example
  * ```ts
  * import { rulingToFinding } from '@orkestrel/qualifier'
- * import { atom, createEvaluator, logicalDefinition, rule } from '@orkestrel/reason'
+ * import { createAtom, createEvaluator, createLogicalDefinition, createRule } from '@orkestrel/reason'
  *
- * const gates = logicalDefinition('gates', 'Gates', [
- *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+ * const gates = createLogicalDefinition('gates', 'Gates', [
+ *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
  * ])
  * const ruling = { id: 'license', pass: 'gates', rule: 'licensed', effect: 'restriction' as const }
  * const result = { reasoning: 'logical' as const, conclusion: true, rules: [{ id: 'licensed', applied: true, premises: [true], conclusion: true }], count: 1, success: true, trace: [], errors: [] }
@@ -553,29 +553,29 @@ export function deriveScopeEligibilities(
 }
 
 /**
- * Find rulings whose pass or rule does not exist, whose pass is not logical, or
- * a pass id shadowing the reserved {@link QUALIFICATION_KEY}.
+ * Describes each ruling whose pass or rule does not exist or whose pass is not
+ * logical, and each pass id shadowing the reserved {@link QUALIFICATION_KEY}.
  *
  * @param definition - The qualification definition to check
  * @returns A fresh list of reference-error messages
  *
  * @example
  * ```ts
- * import { findMissingReferences, qualificationDefinition, rulingDefinition } from '@orkestrel/qualifier'
- * import { atom, logicalDefinition, rule } from '@orkestrel/reason'
+ * import { describeMissingReferences, qualificationDefinition, rulingDefinition } from '@orkestrel/qualifier'
+ * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
  *
- * const gates = logicalDefinition('gates', 'Gates', [
- *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+ * const gates = createLogicalDefinition('gates', 'Gates', [
+ *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
  * ])
  * const definition = qualificationDefinition('standard', 'Standard', [gates], {
  *   rulings: [rulingDefinition('license', 'gates', 'absent', 'restriction')],
  * })
  *
- * findMissingReferences(definition)
+ * describeMissingReferences(definition)
  * // ["Ruling 'license' references missing rule 'absent' in pass 'gates'"]
  * ```
  */
-export function findMissingReferences(definition: QualificationDefinition): readonly string[] {
+export function describeMissingReferences(definition: QualificationDefinition): readonly string[] {
 	const errors: string[] = []
 	const passes = new Map(definition.passes.map((pass) => [pass.id, pass]))
 	for (const pass of definition.passes) {
@@ -696,7 +696,7 @@ export function mapEngineError(error: unknown, pass: string): QualifierError {
 }
 
 /**
- * Find logical passes carrying no rulings.
+ * Describes each logical pass carrying no rulings.
  *
  * @remarks
  * A logical pass with no matching ruling can never contribute a finding, so its
@@ -708,18 +708,18 @@ export function mapEngineError(error: unknown, pass: string): QualifierError {
  *
  * @example
  * ```ts
- * import { findEmptyLogicalPasses, qualificationDefinition } from '@orkestrel/qualifier'
- * import { atom, logicalDefinition, rule } from '@orkestrel/reason'
+ * import { describeEmptyLogicalPasses, qualificationDefinition } from '@orkestrel/qualifier'
+ * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
  *
- * const gates = logicalDefinition('gates', 'Gates', [
- *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+ * const gates = createLogicalDefinition('gates', 'Gates', [
+ *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
  * ])
  * const definition = qualificationDefinition('standard', 'Standard', [gates])
  *
- * findEmptyLogicalPasses(definition) // ["Logical pass 'gates' has no rulings"]
+ * describeEmptyLogicalPasses(definition) // ["Logical pass 'gates' has no rulings"]
  * ```
  */
-export function findEmptyLogicalPasses(definition: QualificationDefinition): readonly string[] {
+export function describeEmptyLogicalPasses(definition: QualificationDefinition): readonly string[] {
 	const warnings: string[] = []
 	for (const pass of definition.passes) {
 		if (pass.reasoning !== 'logical') continue
@@ -730,7 +730,7 @@ export function findEmptyLogicalPasses(definition: QualificationDefinition): rea
 }
 
 /**
- * Find quantitative passes never read by a later pass.
+ * Describes each quantitative pass never read by a later pass.
  *
  * @remarks
  * A quantitative pass's projected value lives under `qualification.<id>` — if no
@@ -744,18 +744,18 @@ export function findEmptyLogicalPasses(definition: QualificationDefinition): rea
  *
  * @example
  * ```ts
- * import { findUnreadDerivations, qualificationDefinition } from '@orkestrel/qualifier'
- * import { factorGroup, quantitativeDefinition, staticFactor } from '@orkestrel/reason'
+ * import { describeUnreadDerivations, qualificationDefinition } from '@orkestrel/qualifier'
+ * import { createFactorGroup, createQuantitativeDefinition, createStaticFactor } from '@orkestrel/reason'
  *
- * const cap = quantitativeDefinition('cap', 'TIV cap', [
- *   factorGroup('limit', 'sum', [staticFactor('base', 500_000)]),
+ * const cap = createQuantitativeDefinition('cap', 'TIV cap', [
+ *   createFactorGroup('limit', 'sum', [createStaticFactor('base', 500_000)]),
  * ])
  * const definition = qualificationDefinition('standard', 'Standard', [cap])
  *
- * findUnreadDerivations(definition) // ["Quantitative pass 'cap' is never read by a later pass"]
+ * describeUnreadDerivations(definition) // ["Quantitative pass 'cap' is never read by a later pass"]
  * ```
  */
-export function findUnreadDerivations(definition: QualificationDefinition): readonly string[] {
+export function describeUnreadDerivations(definition: QualificationDefinition): readonly string[] {
 	const warnings: string[] = []
 	definition.passes.forEach((pass, index) => {
 		if (pass.reasoning !== 'quantitative') return

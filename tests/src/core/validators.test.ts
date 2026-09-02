@@ -10,11 +10,14 @@ import {
 	isQualificationEffect,
 	isQualificationPass,
 	isQualificationResult,
-	isQualificationValidationResult,
 	isRuling,
-	qualificationDefinition,
 } from '@src/core'
-import { logicalDefinition, quantitativeDefinition, rule, atom } from '@orkestrel/reason'
+import {
+	createAtom,
+	createLogicalDefinition,
+	createQuantitativeDefinition,
+	createRule,
+} from '@orkestrel/reason'
 import {
 	buildCyclicRecord,
 	buildCapExcessGatesDefinition,
@@ -23,10 +26,14 @@ import {
 	buildGatesDefinition,
 } from '../../setup.js'
 
-const gatesPass = logicalDefinition('gates', 'Gates', [
-	rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+const gatesPass = createLogicalDefinition('gates', 'Gates', [
+	createRule(
+		'licensed',
+		[createAtom('licensed', 'equals', false)],
+		createAtom('blocked', 'equals', true),
+	),
 ])
-const capPass = quantitativeDefinition('cap', 'Cap', [])
+const capPass = createQuantitativeDefinition('cap', 'Cap', [])
 
 describe('validators', () => {
 	describe('isEligibility', () => {
@@ -453,78 +460,6 @@ describe('validators', () => {
 
 		it('rejects validation results outside the qualification-result membership rule', () => {
 			expect(isQualificationResult({ valid: true, errors: [], warnings: [] })).toBe(false)
-		})
-	})
-
-	describe('isQualificationValidationResult', () => {
-		const valid = { valid: true, errors: [], warnings: ['Definition has no passes'] }
-
-		it('accepts extra members', () => {
-			expect(isQualificationValidationResult({ ...valid, extra: true })).toBe(true)
-		})
-
-		it('accepts a class instance', () => {
-			const value = new (class {
-				readonly valid = true
-				readonly errors = ['error']
-				readonly warnings = ['warning']
-			})()
-			expect(isQualificationValidationResult(value)).toBe(true)
-		})
-
-		it('rejects each wrong member', () => {
-			expect(isQualificationValidationResult({ ...valid, valid: 1 })).toBe(false)
-			expect(isQualificationValidationResult({ ...valid, errors: [false] })).toBe(false)
-			expect(isQualificationValidationResult({ ...valid, warnings: [1] })).toBe(false)
-		})
-
-		it('rejects arrays', () => {
-			expect(isQualificationValidationResult([])).toBe(false)
-		})
-
-		it('returns false without throwing on adversarial objects', () => {
-			const cyclic: Record<string, unknown> = { valid: 1 }
-			cyclic.self = cyclic
-			const nullPrototype = Object.assign(Object.create(null), { valid: 1 })
-			const throwing = Object.defineProperty({}, 'valid', {
-				get() {
-					throw new Error('blocked read')
-				},
-			})
-			const revocable = Proxy.revocable({}, {})
-			revocable.revoke()
-
-			for (const value of [cyclic, nullPrototype, throwing, revocable.proxy]) {
-				expect(() => isQualificationValidationResult(value)).not.toThrow()
-				expect(isQualificationValidationResult(value)).toBe(false)
-			}
-		})
-
-		it('accepts the package engine populated validation result', () => {
-			const instance = createQualifier()
-			try {
-				const result = instance.validate(qualificationDefinition('empty', 'Empty definition', []))
-				expect(result.warnings.length).toBeGreaterThan(0)
-				expect(isQualificationValidationResult(result)).toBe(true)
-			} finally {
-				instance.destroy()
-			}
-		})
-
-		it('rejects qualification results outside the validation-result membership rule', () => {
-			expect(
-				isQualificationValidationResult({
-					id: 'standard',
-					name: 'Standard',
-					eligibility: 'eligible',
-					scopes: {},
-					findings: [],
-					derivations: [],
-					success: true,
-					trace: [],
-					errors: [],
-				}),
-			).toBe(false)
 		})
 	})
 

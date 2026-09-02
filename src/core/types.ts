@@ -110,11 +110,23 @@ export interface QualificationResult {
 	readonly errors: readonly string[]
 }
 
-/** Semantic definition validation. */
-export type QualificationValidationResult = ReasonValidationResult
-
 /** A coded {@link QualifierError} programmer-error code. */
 export type QualifierErrorCode = 'DEFINITION' | 'MISMATCH' | 'DESTROYED' | 'ENGINE'
+
+/**
+ * The structured payload a {@link QualifierError} carries.
+ *
+ * @remarks
+ * `pass` names the pass that was running when the engine threw. `definition` names the
+ * qualification definition that failed semantic validation. `cause` is the original throw
+ * an engine failure wrapped, and stays `unknown` because a thrown value can be anything.
+ * Every member is absent rather than `undefined` when the throw does not carry it.
+ */
+export interface QualifierErrorContext {
+	readonly pass?: string
+	readonly definition?: string
+	readonly cause?: unknown
+}
 
 /** The push observation surface of a {@link QualifierInterface} (AGENTS §13). */
 export type QualifierEventMap = {
@@ -158,10 +170,10 @@ export interface QualifierInterface {
 	 * @example
 	 * ```ts
 	 * import { createQualifier, qualificationDefinition, rulingDefinition } from '@orkestrel/qualifier'
-	 * import { atom, logicalDefinition, rule } from '@orkestrel/reason'
+	 * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
 	 *
-	 * const gates = logicalDefinition('gates', 'Eligibility gates', [
-	 *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+	 * const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+	 *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
 	 * ])
 	 * const definition = qualificationDefinition('standard', 'Standard eligibility', [gates], {
 	 *   rulings: [rulingDefinition('license', 'gates', 'licensed', 'restriction')],
@@ -197,7 +209,7 @@ export interface QualifierInterface {
 	 * qualifier.destroy()
 	 * ```
 	 */
-	validate(definition: QualificationDefinition): QualificationValidationResult
+	validate(definition: QualificationDefinition): ReasonValidationResult
 	/**
 	 * Destroys this qualifier, idempotently.
 	 *

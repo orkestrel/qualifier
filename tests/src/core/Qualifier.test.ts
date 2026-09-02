@@ -8,18 +8,18 @@ import {
 	rulingDefinition,
 } from '@src/core'
 import {
-	atom,
+	createAtom,
 	createEvaluator,
+	createFactorGroup,
+	createFieldFactor,
+	createLogicalDefinition,
 	createLogicalReasoner,
+	createQuantitativeDefinition,
 	createQuantitativeReasoner,
 	createReason,
-	factorGroup,
-	fieldFactor,
-	logicalDefinition,
-	quantitativeDefinition,
-	rule,
-	staticFactor,
-	transform,
+	createRule,
+	createStaticFactor,
+	createTransform,
 } from '@orkestrel/reason'
 import { createRecorder } from '@orkestrel/test'
 import {
@@ -84,14 +84,14 @@ describe('Qualifier', () => {
 	describe('quantitative pre-pass projection', () => {
 		it('lands under qualification, surfaces in derivations, and feeds later logical passes', () => {
 			const qualifier = createQualifier()
-			const cap = quantitativeDefinition('cap', 'Cap', [
-				factorGroup('limit', 'sum', [staticFactor('base', 750_000)]),
+			const cap = createQuantitativeDefinition('cap', 'Cap', [
+				createFactorGroup('limit', 'sum', [createStaticFactor('base', 750_000)]),
 			])
-			const gates = logicalDefinition('gates', 'Gates', [
-				rule(
+			const gates = createLogicalDefinition('gates', 'Gates', [
+				createRule(
 					'cap-check',
-					[atom(['qualification', 'cap'], 'above', 500_000)],
-					atom('blocked', 'equals', true),
+					[createAtom(['qualification', 'cap'], 'above', 500_000)],
+					createAtom('blocked', 'equals', true),
 				),
 			])
 			const definition = qualificationDefinition('property', 'Property', [cap, gates], {
@@ -143,8 +143,12 @@ describe('Qualifier', () => {
 				'condition',
 				'Condition',
 				[
-					logicalDefinition('gates', 'Gates', [
-						rule('note', [atom('note', 'equals', true)], atom('flagged', 'equals', true)),
+					createLogicalDefinition('gates', 'Gates', [
+						createRule(
+							'note',
+							[createAtom('note', 'equals', true)],
+							createAtom('flagged', 'equals', true),
+						),
 					]),
 				],
 				{
@@ -189,10 +193,14 @@ describe('Qualifier', () => {
 	})
 
 	describe('semantic validation', () => {
-		const gates = logicalDefinition('gates', 'Gates', [
-			rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+		const gates = createLogicalDefinition('gates', 'Gates', [
+			createRule(
+				'licensed',
+				[createAtom('licensed', 'equals', false)],
+				createAtom('blocked', 'equals', true),
+			),
 		])
-		const cap = quantitativeDefinition('cap', 'Cap', [])
+		const cap = createQuantitativeDefinition('cap', 'Cap', [])
 
 		it('reports missing pass, non-logical pass, missing rule, reserved pass id, and duplicate ids', () => {
 			const qualifier = createQualifier()
@@ -206,7 +214,7 @@ describe('Qualifier', () => {
 				],
 			})
 			const reserved = qualificationDefinition('reserved', 'Reserved', [
-				quantitativeDefinition(QUALIFICATION_KEY, 'Reserved', []),
+				createQuantitativeDefinition(QUALIFICATION_KEY, 'Reserved', []),
 			])
 
 			const badValidation = qualifier.validate(definition)
@@ -238,12 +246,27 @@ describe('Qualifier', () => {
 			expect(() => qualifier.qualify({ id: 'a' }, definition)).toThrow(
 				expect.objectContaining({
 					code: 'DEFINITION',
-					context: 'bad',
+					context: { definition: 'bad' },
 					name: 'QualifierError',
 				}),
 			)
 
 			qualifier.destroy()
+		})
+
+		it('carries no context on a throw with no payload', () => {
+			const qualifier = createQualifier()
+			qualifier.destroy()
+
+			expect(() =>
+				qualifier.qualify({ id: 'a' }, qualificationDefinition('empty', 'Empty', [])),
+			).toThrow(
+				expect.objectContaining({
+					code: 'DESTROYED',
+					context: undefined,
+					name: 'QualifierError',
+				}),
+			)
 		})
 	})
 
@@ -274,7 +297,7 @@ describe('Qualifier', () => {
 			const injected = createQualifier({ engine })
 			injected.destroy()
 			expect(() =>
-				engine.reason({ id: 'a', total: 1 }, quantitativeDefinition('cap', 'Cap', [])),
+				engine.reason({ id: 'a', total: 1 }, createQuantitativeDefinition('cap', 'Cap', [])),
 			).not.toThrow()
 			engine.destroy()
 
@@ -310,14 +333,22 @@ describe('Qualifier', () => {
 
 	describe('terminal-global proofs', () => {
 		it('stops after an unscoped restriction, continues after referral, and lets later restrictions outrank referral', () => {
-			const referralFirst = logicalDefinition('referral-gates', 'Referral gates', [
-				rule('roof', [atom('roof', 'equals', true)], atom('flagged', 'equals', true)),
+			const referralFirst = createLogicalDefinition('referral-gates', 'Referral gates', [
+				createRule(
+					'roof',
+					[createAtom('roof', 'equals', true)],
+					createAtom('flagged', 'equals', true),
+				),
 			])
-			const restrictionSecond = logicalDefinition('restriction-gates', 'Restriction gates', [
-				rule('frame', [atom('frame', 'equals', true)], atom('blocked', 'equals', true)),
+			const restrictionSecond = createLogicalDefinition('restriction-gates', 'Restriction gates', [
+				createRule(
+					'frame',
+					[createAtom('frame', 'equals', true)],
+					createAtom('blocked', 'equals', true),
+				),
 			])
-			const trailing = quantitativeDefinition('trailing', 'Trailing', [
-				factorGroup('value', 'sum', [staticFactor('one', 1)]),
+			const trailing = createQuantitativeDefinition('trailing', 'Trailing', [
+				createFactorGroup('value', 'sum', [createStaticFactor('one', 1)]),
 			])
 
 			const referralDefinition = qualificationDefinition(
@@ -336,8 +367,12 @@ describe('Qualifier', () => {
 				'terminal',
 				'Terminal',
 				[
-					logicalDefinition('stop', 'Stop', [
-						rule('stop', [atom('stop', 'equals', true)], atom('blocked', 'equals', true)),
+					createLogicalDefinition('stop', 'Stop', [
+						createRule(
+							'stop',
+							[createAtom('stop', 'equals', true)],
+							createAtom('blocked', 'equals', true),
+						),
 					]),
 					trailing,
 				],
@@ -376,11 +411,19 @@ describe('Qualifier', () => {
 
 	describe('scoped-only proofs', () => {
 		it('keeps global eligibility eligible and scopes independent', () => {
-			const wind = logicalDefinition('wind', 'Wind', [
-				rule('coastal', [atom('distance', 'to', 2)], atom('blocked', 'equals', true)),
+			const wind = createLogicalDefinition('wind', 'Wind', [
+				createRule(
+					'coastal',
+					[createAtom('distance', 'to', 2)],
+					createAtom('blocked', 'equals', true),
+				),
 			])
-			const frame = logicalDefinition('frame', 'Frame', [
-				rule('frame', [atom('construction', 'equals', 'Frame')], atom('blocked', 'equals', true)),
+			const frame = createLogicalDefinition('frame', 'Frame', [
+				createRule(
+					'frame',
+					[createAtom('construction', 'equals', 'Frame')],
+					createAtom('blocked', 'equals', true),
+				),
 			])
 			const definition = qualificationDefinition('property', 'Property', [wind, frame], {
 				rulings: [
@@ -415,14 +458,14 @@ describe('Qualifier', () => {
 
 	describe('projection proof', () => {
 		it('never projects derived values onto the caller subject root or other pass keys', () => {
-			const cap = quantitativeDefinition('cap', 'Cap', [
-				factorGroup('limit', 'sum', [staticFactor('base', 500_000)]),
+			const cap = createQuantitativeDefinition('cap', 'Cap', [
+				createFactorGroup('limit', 'sum', [createStaticFactor('base', 500_000)]),
 			])
-			const excess = quantitativeDefinition('excess', 'Excess', [
-				factorGroup('excess', 'sum', [
-					fieldFactor('total', 'total'),
-					fieldFactor('cap', ['qualification', 'cap'], {
-						transforms: [transform('multiply', -1)],
+			const excess = createQuantitativeDefinition('excess', 'Excess', [
+				createFactorGroup('excess', 'sum', [
+					createFieldFactor('total', 'total'),
+					createFieldFactor('cap', ['qualification', 'cap'], {
+						transforms: [createTransform('multiply', -1)],
 					}),
 				]),
 			])
@@ -584,8 +627,12 @@ describe('Qualifier', () => {
 				bail: false,
 			})
 			const qualifier = createQualifier({ engine })
-			const gates = logicalDefinition('gates', 'Gates', [
-				rule('flag', [atom('flag', 'equals', true)], atom('noted', 'equals', true)),
+			const gates = createLogicalDefinition('gates', 'Gates', [
+				createRule(
+					'flag',
+					[createAtom('flag', 'equals', true)],
+					createAtom('noted', 'equals', true),
+				),
 			])
 			const definition = qualificationDefinition('bad', 'Bad', [gates])
 
@@ -612,11 +659,11 @@ describe('Qualifier', () => {
 
 	describe('fail-closed on operational failure', () => {
 		it('stops after the first pass, prefixes trace/errors with the pass id, and reports referral', () => {
-			const cap = quantitativeDefinition('cap', 'Cap', [
-				factorGroup('limit', 'sum', [staticFactor('base', 1)]),
+			const cap = createQuantitativeDefinition('cap', 'Cap', [
+				createFactorGroup('limit', 'sum', [createStaticFactor('base', 1)]),
 			])
-			const excess = quantitativeDefinition('excess', 'Excess', [
-				factorGroup('excess', 'sum', [staticFactor('base', 1)]),
+			const excess = createQuantitativeDefinition('excess', 'Excess', [
+				createFactorGroup('excess', 'sum', [createStaticFactor('base', 1)]),
 			])
 			const definition = qualificationDefinition('property', 'Property', [cap, excess])
 			const qualifier = createQualifier({ engine: createFailingEngine() })
@@ -687,8 +734,12 @@ describe('Qualifier', () => {
 	describe('validate — new warnings', () => {
 		it('warns on a logical pass with no rulings', () => {
 			const qualifier = createQualifier()
-			const gates = logicalDefinition('gates', 'Gates', [
-				rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+			const gates = createLogicalDefinition('gates', 'Gates', [
+				createRule(
+					'licensed',
+					[createAtom('licensed', 'equals', false)],
+					createAtom('blocked', 'equals', true),
+				),
 			])
 			const definition = qualificationDefinition('standard', 'Standard', [gates])
 
@@ -701,8 +752,8 @@ describe('Qualifier', () => {
 
 		it('warns on a quantitative pass never read by a later pass', () => {
 			const qualifier = createQualifier()
-			const cap = quantitativeDefinition('cap', 'Cap', [
-				factorGroup('limit', 'sum', [staticFactor('base', 1)]),
+			const cap = createQuantitativeDefinition('cap', 'Cap', [
+				createFactorGroup('limit', 'sum', [createStaticFactor('base', 1)]),
 			])
 			const definition = qualificationDefinition('standard', 'Standard', [cap])
 
@@ -732,6 +783,20 @@ describe('Qualifier', () => {
 			}).toThrow(TypeError)
 
 			qualifier.destroy()
+		})
+	})
+
+	describe('QualifierError context', () => {
+		it('reads each context member off a caught error without narrowing', () => {
+			const cause = new Error('engine')
+			const definition = new QualifierError('DEFINITION', 'invalid', { definition: 'bad' })
+			const engine = new QualifierError('ENGINE', 'failed', { pass: 'gates', cause })
+
+			expect(definition.context?.definition).toBe('bad')
+			expect(definition.context?.pass).toBeUndefined()
+			expect(engine.context?.pass).toBe('gates')
+			expect(engine.context?.cause).toBe(cause)
+			expect(new QualifierError('MISMATCH', 'm').context).toBeUndefined()
 		})
 	})
 
@@ -771,11 +836,15 @@ function matchesFieldPath(
 }
 
 function qualitativeDefinitionWithDottedField() {
-	const cap = quantitativeDefinition('cap', 'Cap', [
-		factorGroup('limit', 'sum', [fieldFactor('total', 'total')]),
+	const cap = createQuantitativeDefinition('cap', 'Cap', [
+		createFactorGroup('limit', 'sum', [createFieldFactor('total', 'total')]),
 	])
-	const gates = logicalDefinition('gates', 'Gates', [
-		rule('cap-check', [atom('qualification.cap', 'above', 50)], atom('blocked', 'equals', true)),
+	const gates = createLogicalDefinition('gates', 'Gates', [
+		createRule(
+			'cap-check',
+			[createAtom('qualification.cap', 'above', 50)],
+			createAtom('blocked', 'equals', true),
+		),
 	])
 	return qualificationDefinition('property', 'Property', [cap, gates])
 }

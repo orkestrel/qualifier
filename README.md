@@ -24,10 +24,14 @@ npm install @orkestrel/qualifier
 
 ```ts
 import { createQualifier, qualificationDefinition, rulingDefinition } from '@orkestrel/qualifier'
-import { atom, logicalDefinition, rule } from '@orkestrel/reason'
+import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
 
-const gates = logicalDefinition('gates', 'Eligibility gates', [
-	rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+	createRule(
+		'licensed',
+		[createAtom('licensed', 'equals', false)],
+		createAtom('blocked', 'equals', true),
+	),
 ])
 
 const definition = qualificationDefinition('standard', 'Standard eligibility', [gates], {

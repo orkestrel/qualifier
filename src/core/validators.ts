@@ -6,10 +6,8 @@ import type {
 	QualificationDefinition,
 	QualificationPass,
 	QualificationResult,
-	QualificationValidationResult,
 	Ruling,
 } from './types.js'
-import type { Guard } from '@orkestrel/contract'
 import {
 	arrayOf,
 	isBoolean,
@@ -26,7 +24,6 @@ import {
 	isFieldPath,
 	isLogicalDefinition,
 	isQuantitativeDefinition,
-	isReasonValidationResult,
 } from '@orkestrel/reason'
 
 /**
@@ -156,21 +153,6 @@ export function isQualificationResult(value: unknown): value is QualificationRes
 		errors: arrayOf(isString),
 	})(value)
 }
-
-/**
- * Determine whether a value is an open {@link QualificationValidationResult} returned by a qualifier.
- *
- * @remarks
- * `QualificationValidationResult` is an alias of reasons' validation-result type, so this IS
- * reasons' published open result guard by delegation — the alias tracks reasons' shape
- * automatically, and a hand-written member list here would silently stop checking a member a
- * later reason release adds.
- *
- * @param value - The value to test
- * @returns `true` when every published qualification-validation-result member is valid
- */
-export const isQualificationValidationResult: Guard<QualificationValidationResult> =
-	isReasonValidationResult
 
 /**
  * Determine whether a value is a {@link QualificationPass} (a quantitative or logical definition).

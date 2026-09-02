@@ -10,14 +10,14 @@ import type {
 import { qualificationDefinition, rulingDefinition } from '@src/core'
 import { Emitter } from '@orkestrel/emitter'
 import {
-	atom,
-	factorGroup,
-	fieldFactor,
-	logicalDefinition,
-	quantitativeDefinition,
-	rule,
-	staticFactor,
-	transform,
+	createAtom,
+	createFactorGroup,
+	createFieldFactor,
+	createLogicalDefinition,
+	createQuantitativeDefinition,
+	createRule,
+	createStaticFactor,
+	createTransform,
 } from '@orkestrel/reason'
 
 /** Build a cyclic record for adversarial guard tests. */
@@ -52,8 +52,12 @@ export function buildHostileRecord(): Record<string, unknown> {
 
 /** Licensed-gate logical pass with an unscoped restriction ruling. */
 export function buildGatesDefinition(): QualificationDefinition {
-	const gates = logicalDefinition('gates', 'Eligibility gates', [
-		rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+	const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+		createRule(
+			'licensed',
+			[createAtom('licensed', 'equals', false)],
+			createAtom('blocked', 'equals', true),
+		),
 	])
 	return qualificationDefinition('standard', 'Standard eligibility', [gates], {
 		rulings: [
@@ -66,8 +70,12 @@ export function buildGatesDefinition(): QualificationDefinition {
 
 /** Coastal referral ruling with seat-count message interpolation. */
 export function buildReferralDefinition(): QualificationDefinition {
-	const gates = logicalDefinition('gates', 'Coastal gates', [
-		rule('coastal', [atom('coastal', 'equals', true)], atom('flagged', 'equals', true)),
+	const gates = createLogicalDefinition('gates', 'Coastal gates', [
+		createRule(
+			'coastal',
+			[createAtom('coastal', 'equals', true)],
+			createAtom('flagged', 'equals', true),
+		),
 	])
 	return qualificationDefinition('referral', 'Referral program', [gates], {
 		rulings: [
@@ -80,19 +88,23 @@ export function buildReferralDefinition(): QualificationDefinition {
 
 /** Quantitative cap and excess passes followed by a logical TIV gate. */
 export function buildCapExcessGatesDefinition(): QualificationDefinition {
-	const cap = quantitativeDefinition('cap', 'TIV cap', [
-		factorGroup('limit', 'sum', [staticFactor('base', 1_010_000)]),
+	const cap = createQuantitativeDefinition('cap', 'TIV cap', [
+		createFactorGroup('limit', 'sum', [createStaticFactor('base', 1_010_000)]),
 	])
-	const excess = quantitativeDefinition('excess', 'TIV excess', [
-		factorGroup('excess', 'sum', [
-			fieldFactor('total', 'total'),
-			fieldFactor('cap', ['qualification', 'cap'], {
-				transforms: [transform('multiply', -1)],
+	const excess = createQuantitativeDefinition('excess', 'TIV excess', [
+		createFactorGroup('excess', 'sum', [
+			createFieldFactor('total', 'total'),
+			createFieldFactor('cap', ['qualification', 'cap'], {
+				transforms: [createTransform('multiply', -1)],
 			}),
 		]),
 	])
-	const gates = logicalDefinition('gates', 'Eligibility gates', [
-		rule('tiv', [atom(['qualification', 'excess'], 'above', 0)], atom('blocked', 'equals', true)),
+	const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+		createRule(
+			'tiv',
+			[createAtom(['qualification', 'excess'], 'above', 0)],
+			createAtom('blocked', 'equals', true),
+		),
 	])
 	return qualificationDefinition('property', 'Property eligibility', [cap, excess, gates], {
 		rulings: [
@@ -105,8 +117,8 @@ export function buildCapExcessGatesDefinition(): QualificationDefinition {
 
 /** Scoped wind restriction leaving global eligibility eligible. */
 export function buildScopedWindDefinition(): QualificationDefinition {
-	const wind = logicalDefinition('wind', 'Wind eligibility', [
-		rule('coastal', [atom('distance', 'to', 2)], atom('blocked', 'equals', true)),
+	const wind = createLogicalDefinition('wind', 'Wind eligibility', [
+		createRule('coastal', [createAtom('distance', 'to', 2)], createAtom('blocked', 'equals', true)),
 	])
 	return qualificationDefinition('property', 'Property eligibility', [wind], {
 		rulings: [
@@ -120,8 +132,12 @@ export function buildScopedWindDefinition(): QualificationDefinition {
 
 /** Scoped condition ruling that keeps the scope eligible. */
 export function buildConditionDefinition(): QualificationDefinition {
-	const gates = logicalDefinition('gates', 'Eligibility gates', [
-		rule('vacant', [atom('vacant', 'equals', true)], atom('noted', 'equals', true)),
+	const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+		createRule(
+			'vacant',
+			[createAtom('vacant', 'equals', true)],
+			createAtom('noted', 'equals', true),
+		),
 	])
 	return qualificationDefinition('property', 'Property eligibility', [gates], {
 		rulings: [
@@ -135,15 +151,19 @@ export function buildConditionDefinition(): QualificationDefinition {
 
 /** Multi-pass definition proving evidence snapshots for cross-pass and same-pass premises. */
 export function buildEvidenceSnapshotDefinition(): QualificationDefinition {
-	const p1 = quantitativeDefinition('p1', 'Pass 1', [
-		factorGroup('value', 'sum', [staticFactor('base', 42)]),
+	const p1 = createQuantitativeDefinition('p1', 'Pass 1', [
+		createFactorGroup('value', 'sum', [createStaticFactor('base', 42)]),
 	])
-	const p2 = logicalDefinition('p2', 'Pass 2', [
-		rule('r1', [atom(['qualification', 'p1'], 'equals', 42)], atom('ready', 'equals', true)),
-		rule(
+	const p2 = createLogicalDefinition('p2', 'Pass 2', [
+		createRule(
+			'r1',
+			[createAtom(['qualification', 'p1'], 'equals', 42)],
+			createAtom('ready', 'equals', true),
+		),
+		createRule(
 			'r2',
-			[atom(['qualification', 'p2', 'ready'], 'equals', true)],
-			atom('blocked', 'equals', true),
+			[createAtom(['qualification', 'p2', 'ready'], 'equals', true)],
+			createAtom('blocked', 'equals', true),
 		),
 	])
 	return qualificationDefinition('snapshot', 'Snapshot', [p1, p2], {
@@ -156,11 +176,11 @@ export function buildEvidenceSnapshotDefinition(): QualificationDefinition {
 
 /** Logical `gates` pass with a continuing condition ruling, followed by a quantitative `after` pass. */
 export function buildContinuingLogicalDefinition(): QualificationDefinition {
-	const gates = logicalDefinition('gates', 'Gates', [
-		rule('flag', [atom('flag', 'equals', true)], atom('noted', 'equals', true)),
+	const gates = createLogicalDefinition('gates', 'Gates', [
+		createRule('flag', [createAtom('flag', 'equals', true)], createAtom('noted', 'equals', true)),
 	])
-	const after = quantitativeDefinition('after', 'After', [
-		factorGroup('total', 'sum', [staticFactor('base', 1)]),
+	const after = createQuantitativeDefinition('after', 'After', [
+		createFactorGroup('total', 'sum', [createStaticFactor('base', 1)]),
 	])
 	return qualificationDefinition('continuing', 'Continuing', [gates, after], {
 		rulings: [rulingDefinition('note', 'gates', 'flag', 'condition')],

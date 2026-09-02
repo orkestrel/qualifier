@@ -4,22 +4,27 @@ import type {
 	QualificationContext,
 	QualificationDefinition,
 	QualificationResult,
-	QualificationValidationResult,
 	QualifierEventMap,
 	QualifierInterface,
 	QualifierOptions,
 } from './types.js'
 import type { EmitterInterface } from '@orkestrel/emitter'
-import type { EvaluatorInterface, ReasonInterface, ReasonResult, Subject } from '@orkestrel/reason'
+import type {
+	EvaluatorInterface,
+	ReasonInterface,
+	ReasonResult,
+	ReasonValidationResult,
+	Subject,
+} from '@orkestrel/reason'
 import { DEFAULT_QUALIFIER_VALIDATE } from './constants.js'
 import { QualifierError } from './errors.js'
 import {
 	assertSubject,
+	describeEmptyLogicalPasses,
+	describeMissingReferences,
+	describeUnreadDerivations,
 	deriveFindingEligibility,
 	deriveScopeEligibilities,
-	findEmptyLogicalPasses,
-	findMissingReferences,
-	findUnreadDerivations,
 	mapEngineError,
 	mergeQualificationContext,
 	qualificationToRecord,
@@ -117,10 +122,10 @@ export class Qualifier implements QualifierInterface {
 	 * @example
 	 * ```ts
 	 * import { qualificationDefinition, Qualifier, rulingDefinition } from '@orkestrel/qualifier'
-	 * import { atom, logicalDefinition, rule } from '@orkestrel/reason'
+	 * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
 	 *
-	 * const gates = logicalDefinition('gates', 'Eligibility gates', [
-	 *   rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+	 * const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+	 *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
 	 * ])
 	 * const definition = qualificationDefinition('standard', 'Standard eligibility', [gates], {
 	 *   rulings: [rulingDefinition('license', 'gates', 'licensed', 'restriction')],
@@ -139,7 +144,7 @@ export class Qualifier implements QualifierInterface {
 				throw new QualifierError(
 					'DEFINITION',
 					`Qualification definition is invalid: ${validation.errors.join(', ')}`,
-					definition.id,
+					{ definition: definition.id },
 				)
 			}
 		}
@@ -170,7 +175,7 @@ export class Qualifier implements QualifierInterface {
 	 * qualifier.destroy()
 	 * ```
 	 */
-	validate(definition: QualificationDefinition): QualificationValidationResult {
+	validate(definition: QualificationDefinition): ReasonValidationResult {
 		this.#alive()
 		const errors: string[] = []
 		const warnings: string[] = []
@@ -188,10 +193,10 @@ export class Qualifier implements QualifierInterface {
 		for (const id of findDuplicates(definition.rulings ?? [])) {
 			errors.push(`Duplicate ruling id '${id}'`)
 		}
-		for (const reference of findMissingReferences(definition)) errors.push(reference)
+		for (const reference of describeMissingReferences(definition)) errors.push(reference)
 		if (definition.passes.length === 0) warnings.push('Definition has no passes')
-		for (const warning of findEmptyLogicalPasses(definition)) warnings.push(warning)
-		for (const warning of findUnreadDerivations(definition)) warnings.push(warning)
+		for (const warning of describeEmptyLogicalPasses(definition)) warnings.push(warning)
+		for (const warning of describeUnreadDerivations(definition)) warnings.push(warning)
 		return { valid: errors.length === 0, errors, warnings }
 	}
 

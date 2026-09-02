@@ -3,15 +3,15 @@ import type { Finding } from '@src/core'
 import {
 	assertSubject,
 	combineEligibilities,
+	describeComparison,
+	describeEmptyLogicalPasses,
+	describeMissingReferences,
+	describePremise,
+	describeUnreadDerivations,
+	describeValue,
 	deriveFindingEligibility,
 	deriveScopeEligibilities,
-	describeComparison,
-	describePremise,
-	describeValue,
-	findEmptyLogicalPasses,
-	findMissingReferences,
 	findRule,
-	findUnreadDerivations,
 	hasReservedKey,
 	interpolateMessage,
 	logicalPremises,
@@ -28,22 +28,26 @@ import {
 } from '@src/core'
 import type { Comparison } from '@orkestrel/reason'
 import {
-	atom,
-	check,
+	createAtom,
+	createCheck,
 	createEvaluator,
-	factorGroup,
-	fieldFactor,
-	logicalDefinition,
-	quantitativeDefinition,
+	createFactorGroup,
+	createFieldFactor,
+	createLogicalDefinition,
+	createQuantitativeDefinition,
+	createRule,
+	createStaticFactor,
 	ReasonError,
-	rule,
-	staticFactor,
 } from '@orkestrel/reason'
 
-const gatesPass = logicalDefinition('gates', 'Gates', [
-	rule('licensed', [atom('licensed', 'equals', false)], atom('blocked', 'equals', true)),
+const gatesPass = createLogicalDefinition('gates', 'Gates', [
+	createRule(
+		'licensed',
+		[createAtom('licensed', 'equals', false)],
+		createAtom('blocked', 'equals', true),
+	),
 ])
-const capPass = quantitativeDefinition('cap', 'Cap', [])
+const capPass = createQuantitativeDefinition('cap', 'Cap', [])
 
 function finding(
 	overrides: Partial<Finding> & Pick<Finding, 'id' | 'pass' | 'rule' | 'effect' | 'applied'>,
@@ -250,7 +254,7 @@ describe('helpers', () => {
 		})
 	})
 
-	describe('findMissingReferences', () => {
+	describe('describeMissingReferences', () => {
 		it('reports missing pass, non-logical pass, missing rule, and reserved pass id', () => {
 			const definition = qualificationDefinition('bad', 'Bad', [capPass, gatesPass], {
 				rulings: [
@@ -260,15 +264,15 @@ describe('helpers', () => {
 				],
 			})
 			const reserved = qualificationDefinition('reserved', 'Reserved', [
-				quantitativeDefinition(QUALIFICATION_KEY, 'Reserved', []),
+				createQuantitativeDefinition(QUALIFICATION_KEY, 'Reserved', []),
 			])
-			const errors = findMissingReferences(definition)
+			const errors = describeMissingReferences(definition)
 			expect(errors).toContain("Ruling 'missing-pass' references missing pass 'absent'")
 			expect(errors).toContain("Ruling 'quant-pass' references non-logical pass 'cap'")
 			expect(errors).toContain(
 				"Ruling 'missing-rule' references missing rule 'absent' in pass 'gates'",
 			)
-			expect(findMissingReferences(reserved)).toContain(
+			expect(describeMissingReferences(reserved)).toContain(
 				`Pass id must not equal reserved key '${QUALIFICATION_KEY}'`,
 			)
 		})
@@ -337,11 +341,11 @@ describe('helpers', () => {
 		})
 
 		it('never pollutes Object.prototype through hostile conclusion keys', () => {
-			const polluted = logicalDefinition('pollute', 'Pollute', [
-				rule(
+			const polluted = createLogicalDefinition('pollute', 'Pollute', [
+				createRule(
 					'proto',
-					[atom('licensed', 'equals', false)],
-					atom(['__proto__', 'polluted'], 'equals', true),
+					[createAtom('licensed', 'equals', false)],
+					createAtom(['__proto__', 'polluted'], 'equals', true),
 				),
 			])
 			const before = Object.prototype
@@ -525,8 +529,12 @@ describe('helpers', () => {
 
 	describe('logicalPremises / premiseCheck / rulingToFinding', () => {
 		it('returns 0 premises for an empty membership value', () => {
-			const gates = logicalDefinition('gates', 'Gates', [
-				rule('membership', [atom('tag', 'any', [])], atom('flagged', 'equals', true)),
+			const gates = createLogicalDefinition('gates', 'Gates', [
+				createRule(
+					'membership',
+					[createAtom('tag', 'any', [])],
+					createAtom('flagged', 'equals', true),
+				),
 			])
 			const evaluator = createEvaluator()
 			const membership = findRule(gates, 'membership')
@@ -537,8 +545,12 @@ describe('helpers', () => {
 		})
 
 		it('returns 1 premise for a non-empty membership check, met via a real evaluator', () => {
-			const gates = logicalDefinition('gates', 'Gates', [
-				rule('membership', [atom('tag', 'any', ['coastal'])], atom('flagged', 'equals', true)),
+			const gates = createLogicalDefinition('gates', 'Gates', [
+				createRule(
+					'membership',
+					[createAtom('tag', 'any', ['coastal'])],
+					createAtom('flagged', 'equals', true),
+				),
 			])
 			const evaluator = createEvaluator()
 			const membership = findRule(gates, 'membership')
@@ -551,7 +563,7 @@ describe('helpers', () => {
 
 		it('premiseCheck includes label only when labels[field] is set', () => {
 			const evaluator = createEvaluator()
-			const authored = check('age', 'above', 18)
+			const authored = createCheck('age', 'above', 18)
 			const withoutLabel = premiseCheck(authored, evaluator.evaluate(authored, { age: 25 }))
 			expect('label' in withoutLabel).toBe(false)
 			const withLabel = premiseCheck(authored, evaluator.evaluate(authored, { age: 25 }), {
@@ -562,7 +574,7 @@ describe('helpers', () => {
 
 		it('premiseCheck carries met and actual through for an unmet check', () => {
 			const evaluator = createEvaluator()
-			const authored = check('age', 'above', 18)
+			const authored = createCheck('age', 'above', 18)
 			const premise = premiseCheck(authored, evaluator.evaluate(authored, { age: 12 }))
 			expect(premise.met).toBe(false)
 			expect(premise.actual).toBe(12)
@@ -626,17 +638,15 @@ describe('helpers', () => {
 			const original = new ReasonError('INVALID', 'v')
 			const mapped = mapEngineError(original, 'p')
 			expect(mapped.code).toBe('DEFINITION')
-			const { context } = mapped
-			const cause =
-				typeof context === 'object' && context !== null && 'cause' in context
-					? context.cause
-					: undefined
-			expect(cause).toBe(original)
+			expect(mapped.context?.cause).toBe(original)
+			expect(mapped.context?.pass).toBe('p')
 		})
 
 		it('maps ReasonError DESTROYED to DESTROYED', () => {
-			const mapped = mapEngineError(new ReasonError('DESTROYED', 'd'), 'p')
+			const original = new ReasonError('DESTROYED', 'd')
+			const mapped = mapEngineError(original, 'p')
 			expect(mapped.code).toBe('DESTROYED')
+			expect(mapped.context).toEqual({ pass: 'p', cause: original })
 		})
 
 		it('maps ReasonError MISSING to ENGINE', () => {
@@ -654,58 +664,61 @@ describe('helpers', () => {
 			const mapped = mapEngineError('oops', 'p')
 			expect(mapped.code).toBe('ENGINE')
 			expect(mapped.message).toContain('oops')
+			expect(mapped.context).toEqual({ pass: 'p', cause: 'oops' })
 		})
 	})
 
-	describe('findEmptyLogicalPasses', () => {
+	describe('describeEmptyLogicalPasses', () => {
 		it('warns for a logical pass carrying no ruling', () => {
 			const definition = qualificationDefinition('standard', 'Standard', [gatesPass])
-			expect(findEmptyLogicalPasses(definition)).toEqual(["Logical pass 'gates' has no rulings"])
+			expect(describeEmptyLogicalPasses(definition)).toEqual([
+				"Logical pass 'gates' has no rulings",
+			])
 		})
 
 		it('returns [] when every logical pass has a ruling', () => {
 			const definition = qualificationDefinition('standard', 'Standard', [gatesPass], {
 				rulings: [rulingDefinition('license', 'gates', 'licensed', 'restriction')],
 			})
-			expect(findEmptyLogicalPasses(definition)).toEqual([])
+			expect(describeEmptyLogicalPasses(definition)).toEqual([])
 		})
 	})
 
-	describe('findUnreadDerivations', () => {
+	describe('describeUnreadDerivations', () => {
 		it('returns [] when a quantitative pass is read by a later logical pass', () => {
-			const cap = quantitativeDefinition('cap', 'Cap', [
-				factorGroup('limit', 'sum', [staticFactor('base', 100)]),
+			const cap = createQuantitativeDefinition('cap', 'Cap', [
+				createFactorGroup('limit', 'sum', [createStaticFactor('base', 100)]),
 			])
-			const gates = logicalDefinition('gates', 'Gates', [
-				rule(
+			const gates = createLogicalDefinition('gates', 'Gates', [
+				createRule(
 					'over',
-					[atom(['qualification', 'cap'], 'above', 50)],
-					atom('blocked', 'equals', true),
+					[createAtom(['qualification', 'cap'], 'above', 50)],
+					createAtom('blocked', 'equals', true),
 				),
 			])
 			const definition = qualificationDefinition('standard', 'Standard', [cap, gates])
-			expect(findUnreadDerivations(definition)).toEqual([])
+			expect(describeUnreadDerivations(definition)).toEqual([])
 		})
 
 		it('does not warn for a quantitative pass read by a later quantitative pass factor field', () => {
-			const cap = quantitativeDefinition('cap', 'Cap', [
-				factorGroup('limit', 'sum', [staticFactor('base', 100)]),
+			const cap = createQuantitativeDefinition('cap', 'Cap', [
+				createFactorGroup('limit', 'sum', [createStaticFactor('base', 100)]),
 			])
-			const excess = quantitativeDefinition('excess', 'Excess', [
-				factorGroup('excess', 'sum', [fieldFactor('cap', ['qualification', 'cap'])]),
+			const excess = createQuantitativeDefinition('excess', 'Excess', [
+				createFactorGroup('excess', 'sum', [createFieldFactor('cap', ['qualification', 'cap'])]),
 			])
 			const definition = qualificationDefinition('standard', 'Standard', [cap, excess])
-			expect(findUnreadDerivations(definition)).not.toContain(
+			expect(describeUnreadDerivations(definition)).not.toContain(
 				"Quantitative pass 'cap' is never read by a later pass",
 			)
 		})
 
 		it('warns for a trailing quantitative pass read by nobody', () => {
-			const cap = quantitativeDefinition('cap', 'Cap', [
-				factorGroup('limit', 'sum', [staticFactor('base', 100)]),
+			const cap = createQuantitativeDefinition('cap', 'Cap', [
+				createFactorGroup('limit', 'sum', [createStaticFactor('base', 100)]),
 			])
 			const definition = qualificationDefinition('standard', 'Standard', [cap])
-			expect(findUnreadDerivations(definition)).toEqual([
+			expect(describeUnreadDerivations(definition)).toEqual([
 				"Quantitative pass 'cap' is never read by a later pass",
 			])
 		})
