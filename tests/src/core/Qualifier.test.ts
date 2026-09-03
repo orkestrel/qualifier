@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+	createQualificationDefinition,
 	createQualifier,
+	createRuling,
 	isQualifierError,
-	QualifierError,
-	qualificationDefinition,
 	QUALIFICATION_KEY,
-	rulingDefinition,
+	QualifierError,
 } from '@src/core'
 import {
 	createAtom,
@@ -27,12 +27,13 @@ import {
 	buildCapExcessGatesDefinition,
 	buildConditionDefinition,
 	buildContinuingLogicalDefinition,
+	buildDottedFieldDefinition,
 	buildEvidenceSnapshotDefinition,
 	buildGatesDefinition,
 	buildReferralDefinition,
 	buildScopedWindDefinition,
 	createFailingEngine,
-} from '../../setup'
+} from '../../setup.js'
 
 const FORBIDDEN_RESULT_KEYS: readonly string[] = [
 	'amount',
@@ -95,9 +96,9 @@ describe('Qualifier', () => {
 					createAtom('blocked', 'equals', true),
 				),
 			])
-			const definition = qualificationDefinition('property', 'Property', [cap, gates], {
+			const definition = createQualificationDefinition('property', 'Property', [cap, gates], {
 				rulings: [
-					rulingDefinition('cap', 'gates', 'cap-check', 'restriction', {
+					createRuling('cap', 'gates', 'cap-check', 'restriction', {
 						message: 'Cap exceeded',
 					}),
 				],
@@ -140,7 +141,7 @@ describe('Qualifier', () => {
 		it('maps restriction, referral, and condition to global eligibility', () => {
 			const restriction = buildGatesDefinition()
 			const referral = buildReferralDefinition()
-			const condition = qualificationDefinition(
+			const condition = createQualificationDefinition(
 				'condition',
 				'Condition',
 				[
@@ -154,7 +155,7 @@ describe('Qualifier', () => {
 				],
 				{
 					rulings: [
-						rulingDefinition('note', 'gates', 'note', 'condition', {
+						createRuling('note', 'gates', 'note', 'condition', {
 							message: 'Advisory only',
 						}),
 					],
@@ -205,16 +206,16 @@ describe('Qualifier', () => {
 
 		it('reports missing pass, non-logical pass, missing rule, reserved pass id, and duplicate ids', () => {
 			const qualifier = createQualifier()
-			const definition = qualificationDefinition('bad', 'Bad', [cap, gates, gates], {
+			const definition = createQualificationDefinition('bad', 'Bad', [cap, gates, gates], {
 				rulings: [
-					rulingDefinition('dup', 'gates', 'licensed', 'restriction'),
-					rulingDefinition('dup', 'gates', 'licensed', 'referral'),
-					rulingDefinition('missing-pass', 'absent', 'licensed', 'restriction'),
-					rulingDefinition('quant-pass', 'cap', 'base', 'restriction'),
-					rulingDefinition('missing-rule', 'gates', 'absent', 'restriction'),
+					createRuling('dup', 'gates', 'licensed', 'restriction'),
+					createRuling('dup', 'gates', 'licensed', 'referral'),
+					createRuling('missing-pass', 'absent', 'licensed', 'restriction'),
+					createRuling('quant-pass', 'cap', 'base', 'restriction'),
+					createRuling('missing-rule', 'gates', 'absent', 'restriction'),
 				],
 			})
-			const reserved = qualificationDefinition('reserved', 'Reserved', [
+			const reserved = createQualificationDefinition('reserved', 'Reserved', [
 				createQuantitativeDefinition(QUALIFICATION_KEY, 'Reserved', []),
 			])
 
@@ -240,8 +241,8 @@ describe('Qualifier', () => {
 
 		it('throws DEFINITION before the engine runs when validation is enabled', () => {
 			const qualifier = createQualifier()
-			const definition = qualificationDefinition('bad', 'Bad', [cap], {
-				rulings: [rulingDefinition('missing-pass', 'absent', 'licensed', 'restriction')],
+			const definition = createQualificationDefinition('bad', 'Bad', [cap], {
+				rulings: [createRuling('missing-pass', 'absent', 'licensed', 'restriction')],
 			})
 
 			expect(() => qualifier.qualify({ id: 'a' }, definition)).toThrow(
@@ -260,7 +261,7 @@ describe('Qualifier', () => {
 			qualifier.destroy()
 
 			expect(() =>
-				qualifier.qualify({ id: 'a' }, qualificationDefinition('empty', 'Empty', [])),
+				qualifier.qualify({ id: 'a' }, createQualificationDefinition('empty', 'Empty', [])),
 			).toThrow(
 				expect.objectContaining({
 					code: 'DESTROYED',
@@ -317,7 +318,7 @@ describe('Qualifier', () => {
 	describe('empty definition', () => {
 		it('qualifies as eligible with no findings or derivations', () => {
 			const qualifier = createQualifier()
-			const definition = qualificationDefinition('empty', 'Empty', [])
+			const definition = createQualificationDefinition('empty', 'Empty', [])
 			const result = qualifier.qualify({ id: 'risk-1' }, definition)
 
 			expect(result).toEqual(
@@ -352,19 +353,19 @@ describe('Qualifier', () => {
 				createFactorGroup('value', 'sum', [createStaticFactor('one', 1)]),
 			])
 
-			const referralDefinition = qualificationDefinition(
+			const referralDefinition = createQualificationDefinition(
 				'mixed',
 				'Mixed',
 				[referralFirst, restrictionSecond, trailing],
 				{
 					rulings: [
-						rulingDefinition('roof', 'referral-gates', 'roof', 'referral'),
-						rulingDefinition('frame', 'restriction-gates', 'frame', 'restriction'),
+						createRuling('roof', 'referral-gates', 'roof', 'referral'),
+						createRuling('frame', 'restriction-gates', 'frame', 'restriction'),
 					],
 				},
 			)
 
-			const restrictionFirst = qualificationDefinition(
+			const restrictionFirst = createQualificationDefinition(
 				'terminal',
 				'Terminal',
 				[
@@ -378,7 +379,7 @@ describe('Qualifier', () => {
 					trailing,
 				],
 				{
-					rulings: [rulingDefinition('stop', 'stop', 'stop', 'restriction')],
+					rulings: [createRuling('stop', 'stop', 'stop', 'restriction')],
 				},
 			)
 
@@ -399,8 +400,8 @@ describe('Qualifier', () => {
 
 			const referralContinues = qualifier.qualify(
 				{ id: 'c', roof: true },
-				qualificationDefinition('continue', 'Continue', [referralFirst, trailing], {
-					rulings: [rulingDefinition('roof', 'referral-gates', 'roof', 'referral')],
+				createQualificationDefinition('continue', 'Continue', [referralFirst, trailing], {
+					rulings: [createRuling('roof', 'referral-gates', 'roof', 'referral')],
 				}),
 			)
 			expect(referralContinues.eligibility).toBe('referral')
@@ -426,10 +427,10 @@ describe('Qualifier', () => {
 					createAtom('blocked', 'equals', true),
 				),
 			])
-			const definition = qualificationDefinition('property', 'Property', [wind, frame], {
+			const definition = createQualificationDefinition('property', 'Property', [wind, frame], {
 				rulings: [
-					rulingDefinition('coastal', 'wind', 'coastal', 'restriction', { scope: 'wind' }),
-					rulingDefinition('frame', 'frame', 'frame', 'referral', { scope: 'frame' }),
+					createRuling('coastal', 'wind', 'coastal', 'restriction', { scope: 'wind' }),
+					createRuling('frame', 'frame', 'frame', 'referral', { scope: 'frame' }),
 				],
 			})
 
@@ -470,7 +471,7 @@ describe('Qualifier', () => {
 					}),
 				]),
 			])
-			const definition = qualificationDefinition('property', 'Property', [cap, excess])
+			const definition = createQualificationDefinition('property', 'Property', [cap, excess])
 			const subject = { id: 'risk-1', total: 750_000 }
 
 			const qualifier = createQualifier()
@@ -482,7 +483,7 @@ describe('Qualifier', () => {
 			expect('qualification' in subject).toBe(false)
 			expect(result.derivations.map((entry) => entry.id)).toEqual(['cap', 'excess'])
 
-			const dotted = qualitativeDefinitionWithDottedField()
+			const dotted = buildDottedFieldDefinition()
 			const dottedResult = qualifier.qualify(
 				{ id: 'risk-2', total: 10, 'qualification.cap': 99 },
 				dotted,
@@ -635,7 +636,7 @@ describe('Qualifier', () => {
 					createAtom('noted', 'equals', true),
 				),
 			])
-			const definition = qualificationDefinition('bad', 'Bad', [gates])
+			const definition = createQualificationDefinition('bad', 'Bad', [gates])
 
 			expect(() => qualifier.qualify({ id: 'x', flag: true }, definition)).toThrow(
 				expect.objectContaining({ code: 'ENGINE', name: 'QualifierError' }),
@@ -666,7 +667,7 @@ describe('Qualifier', () => {
 			const excess = createQuantitativeDefinition('excess', 'Excess', [
 				createFactorGroup('excess', 'sum', [createStaticFactor('base', 1)]),
 			])
-			const definition = qualificationDefinition('property', 'Property', [cap, excess])
+			const definition = createQualificationDefinition('property', 'Property', [cap, excess])
 			const qualifier = createQualifier({ engine: createFailingEngine() })
 
 			const result = qualifier.qualify({ id: 'risk-1' }, definition)
@@ -685,7 +686,7 @@ describe('Qualifier', () => {
 	describe('validate — id/name/warnings channel', () => {
 		it('reports an empty id', () => {
 			const qualifier = createQualifier()
-			const definition = qualificationDefinition('', 'Standard', [])
+			const definition = createQualificationDefinition('', 'Standard', [])
 
 			expect(qualifier.validate(definition).valid).toBe(false)
 			expect(qualifier.validate(definition).errors).toContain('Definition id must not be empty')
@@ -695,7 +696,7 @@ describe('Qualifier', () => {
 
 		it('reports an empty name', () => {
 			const qualifier = createQualifier()
-			const definition = qualificationDefinition('standard', '', [])
+			const definition = createQualificationDefinition('standard', '', [])
 
 			expect(qualifier.validate(definition).errors).toContain('Definition name must not be empty')
 
@@ -716,7 +717,7 @@ describe('Qualifier', () => {
 	describe('validate — empty passes fail-open', () => {
 		it('is valid with a no-passes warning, and qualifies as eligible', () => {
 			const qualifier = createQualifier()
-			const definition = qualificationDefinition('empty', 'Empty', [])
+			const definition = createQualificationDefinition('empty', 'Empty', [])
 
 			expect(qualifier.validate(definition)).toEqual({
 				valid: true,
@@ -743,7 +744,7 @@ describe('Qualifier', () => {
 					createAtom('blocked', 'equals', true),
 				),
 			])
-			const definition = qualificationDefinition('standard', 'Standard', [gates])
+			const definition = createQualificationDefinition('standard', 'Standard', [gates])
 
 			const validation = qualifier.validate(definition)
 			expect(validation.valid).toBe(true)
@@ -757,7 +758,7 @@ describe('Qualifier', () => {
 			const cap = createQuantitativeDefinition('cap', 'Cap', [
 				createFactorGroup('limit', 'sum', [createStaticFactor('base', 1)]),
 			])
-			const definition = qualificationDefinition('standard', 'Standard', [cap])
+			const definition = createQualificationDefinition('standard', 'Standard', [cap])
 
 			const validation = qualifier.validate(definition)
 			expect(validation.valid).toBe(true)
@@ -835,18 +836,4 @@ function matchesFieldPath(
 		)
 	}
 	return field === expected.join('.')
-}
-
-function qualitativeDefinitionWithDottedField() {
-	const cap = createQuantitativeDefinition('cap', 'Cap', [
-		createFactorGroup('limit', 'sum', [createFieldFactor('total', 'total')]),
-	])
-	const gates = createLogicalDefinition('gates', 'Gates', [
-		createRule(
-			'cap-check',
-			[createAtom('qualification.cap', 'above', 50)],
-			createAtom('blocked', 'equals', true),
-		),
-	])
-	return qualificationDefinition('property', 'Property', [cap, gates])
 }

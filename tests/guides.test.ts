@@ -17,7 +17,18 @@ import {
 	parseManifest,
 	resolveLink,
 } from '@orkestrel/guide'
+import { createQualificationDefinition, createQualifier, createRuling } from '@src/core'
 import { readFileSync } from 'node:fs'
+import {
+	createAtom,
+	createFactorGroup,
+	createFieldFactor,
+	createLogicalDefinition,
+	createQuantitativeDefinition,
+	createRule,
+	createStaticFactor,
+	createTransform,
+} from '@orkestrel/reason'
 import { requireValue } from '@orkestrel/test'
 import { readInventory } from '@orkestrel/test/server'
 
@@ -168,3 +179,119 @@ for (const entry of manifest) {
 		})
 	})
 }
+
+// Parity proves each documented name resolves. These cases run the guide's flagship fences
+// and assert the values their comments claim, so a fence that documents an outcome the code
+// contradicts reddens here. Each case pairs its behavioural assertions with a presence guard
+// on the commented lines, so editing a fence orphans the transcription instead of leaving it
+// silently disagreeing.
+describe('flagship fences', () => {
+	const guideText = requireValue(files['guides/qualifier.md'], 'Missing file: guides/qualifier.md')
+
+	it('returns what the Surface fence claims', () => {
+		const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+			createRule(
+				'licensed',
+				[createAtom('licensed', 'equals', false)],
+				createAtom('blocked', 'equals', true),
+			),
+		])
+		const definition = createQualificationDefinition('standard', 'Standard eligibility', [gates], {
+			rulings: [
+				createRuling('license', 'gates', 'licensed', 'restriction', {
+					message: 'A license is required',
+				}),
+			],
+		})
+
+		const qualifier = createQualifier()
+		const result = qualifier.qualify({ id: 'risk-1', licensed: false }, definition)
+
+		expect(result.eligibility).toBe('ineligible')
+		expect(result.findings[0]?.message).toBe('A license is required')
+		expect(result.derivations).toEqual([])
+		expect(guideText).toContain("result.eligibility // 'ineligible'")
+		expect(guideText).toContain("result.findings[0]?.message // 'A license is required'")
+		expect(guideText).toContain('result.derivations // [] — no quantitative pass ran')
+
+		qualifier.destroy()
+	})
+
+	it('returns what the Patterns fence claims', () => {
+		const cap = createQuantitativeDefinition('cap', 'TIV cap', [
+			createFactorGroup('limit', 'sum', [createStaticFactor('base', 1_000_000)]),
+		])
+		const excess = createQuantitativeDefinition('excess', 'TIV excess', [
+			createFactorGroup('amount', 'sum', [
+				createFieldFactor('total', 'total'),
+				createFieldFactor('cap', ['qualification', 'cap'], {
+					transforms: [createTransform('multiply', -1)],
+				}),
+			]),
+		])
+		const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+			createRule(
+				'tiv',
+				[createAtom(['qualification', 'excess'], 'above', 0)],
+				createAtom('blocked', 'equals', true),
+			),
+		])
+		const definition = createQualificationDefinition(
+			'property',
+			'Property eligibility',
+			[cap, excess, gates],
+			{
+				rulings: [
+					createRuling('tiv', 'gates', 'tiv', 'restriction', {
+						message: 'TIV exceeds the maximum',
+					}),
+				],
+			},
+		)
+
+		const qualifier = createQualifier()
+		const subject = { total: 1_250_000 }
+		const result = qualifier.qualify(subject, definition)
+
+		expect(result.eligibility).toBe('ineligible')
+		expect(result.derivations.map((entry) => [entry.id, entry.value])).toEqual([
+			['cap', 1_000_000],
+			['excess', 250_000],
+		])
+		// The prose under the fence claims the caller's subject is untouched.
+		expect(subject).toEqual({ total: 1_250_000 })
+		expect(guideText).toContain("result.eligibility // 'ineligible'")
+		expect(guideText).toContain("// [['cap', 1000000], ['excess', 250000]]")
+		expect(guideText).toContain("The caller's subject stays `{ total: 1_250_000 }`")
+
+		qualifier.destroy()
+	})
+
+	it('returns what the Methods fence claims', () => {
+		const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+			createRule(
+				'licensed',
+				[createAtom('licensed', 'equals', false)],
+				createAtom('blocked', 'equals', true),
+			),
+		])
+		const definition = createQualificationDefinition('standard', 'Standard eligibility', [gates], {
+			rulings: [createRuling('license', 'gates', 'licensed', 'restriction')],
+		})
+
+		const qualifier = createQualifier()
+
+		expect(qualifier.validate(definition)).toEqual({ valid: true, errors: [], warnings: [] })
+		expect(qualifier.qualify({ id: 'a', licensed: false }, definition).eligibility).toBe(
+			'ineligible',
+		)
+		expect(guideText).toContain(
+			'qualifier.validate(definition) // { valid: true, errors: [], warnings: [] }',
+		)
+		expect(guideText).toContain(
+			"qualifier.qualify({ id: 'a', licensed: false }, definition) // eligibility: 'ineligible'",
+		)
+
+		qualifier.destroy()
+	})
+})

@@ -1,4 +1,13 @@
-import type { QualifierInterface, QualifierOptions } from './types.js'
+import type {
+	QualificationDefinition,
+	QualificationEffect,
+	QualificationInput,
+	QualificationPass,
+	QualifierInterface,
+	QualifierOptions,
+	Ruling,
+	RulingInput,
+} from './types.js'
 import { Qualifier } from './Qualifier.js'
 
 /**
@@ -7,7 +16,10 @@ import { Qualifier } from './Qualifier.js'
  * @remarks
  * A standalone qualifier creates and OWNS one shared quantitative-plus-logical
  * reason engine, destroying it on `destroy()`. An injected `options.engine`
- * remains caller-owned and is never destroyed. Validation is on by default.
+ * remains caller-owned and is never destroyed. `validate` runs semantic
+ * validation before every qualification. Default: `true`. `labels` overrides the
+ * display name of a premise field, keyed by the dot-joined field path
+ * `formatField` produces, and takes precedence over a premise's own `label`.
  *
  * @param options - Optional injected engine, validation, labels, and emitter hooks
  * @returns A {@link QualifierInterface}
@@ -23,4 +35,75 @@ import { Qualifier } from './Qualifier.js'
  */
 export function createQualifier(options?: QualifierOptions): QualifierInterface {
 	return new Qualifier(options)
+}
+
+/**
+ * Creates a {@link QualificationDefinition}.
+ *
+ * @remarks
+ * Returns a fresh top-level definition, omitting absent optional keys;
+ * `passes` and `rulings` arrays are copied, and record `metadata` is
+ * shallow-copied so nested values are not deep-cloned.
+ *
+ * @param id - The definition id
+ * @param name - The display name
+ * @param passes - The ordered qualification passes
+ * @param input - Optional description, rulings, and metadata
+ * @returns A fresh qualification definition
+ *
+ * @example
+ * ```ts
+ * import { createQualificationDefinition } from '@orkestrel/qualifier'
+ *
+ * createQualificationDefinition('standard', 'Standard', [gates], { rulings: [ruling] })
+ * ```
+ */
+export function createQualificationDefinition(
+	id: string,
+	name: string,
+	passes: readonly QualificationPass[],
+	input?: QualificationInput,
+): QualificationDefinition {
+	return {
+		id,
+		name,
+		passes: [...passes],
+		...(input?.description === undefined ? {} : { description: input.description }),
+		...(input?.rulings === undefined ? {} : { rulings: [...input.rulings] }),
+		...(input?.metadata === undefined ? {} : { metadata: { ...input.metadata } }),
+	}
+}
+
+/**
+ * Creates a {@link Ruling} — one authored consequence for one rule in one pass.
+ *
+ * @param id - The ruling id
+ * @param pass - The logical pass id the rule lives in
+ * @param rule - The rule id whose firing this ruling reacts to
+ * @param effect - The eligibility impact when the rule fires
+ * @param input - Optional selection scope and message template
+ * @returns A fresh ruling
+ *
+ * @example
+ * ```ts
+ * import { createRuling } from '@orkestrel/qualifier'
+ *
+ * createRuling('license', 'gates', 'licensed', 'restriction', { message: 'A license is required' })
+ * ```
+ */
+export function createRuling(
+	id: string,
+	pass: string,
+	rule: string,
+	effect: QualificationEffect,
+	input?: RulingInput,
+): Ruling {
+	return {
+		id,
+		pass,
+		rule,
+		effect,
+		...(input?.scope === undefined ? {} : { scope: input.scope }),
+		...(input?.message === undefined ? {} : { message: input.message }),
+	}
 }

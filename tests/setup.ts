@@ -1,4 +1,4 @@
-import type { QualificationDefinition } from '@src/core'
+import type { Finding, QualificationDefinition } from '@src/core'
 import type {
 	Definition,
 	QuantitativeResult,
@@ -7,7 +7,7 @@ import type {
 	ReasonResult,
 	Subject,
 } from '@orkestrel/reason'
-import { qualificationDefinition, rulingDefinition } from '@src/core'
+import { createQualificationDefinition, createRuling } from '@src/core'
 import { Emitter } from '@orkestrel/emitter'
 import {
 	createAtom,
@@ -19,6 +19,29 @@ import {
 	createStaticFactor,
 	createTransform,
 } from '@orkestrel/reason'
+
+/** Build every ordering of a list, so a case can drive an order-independent helper with each. */
+export function buildPermutations<T>(list: readonly T[]): readonly T[][] {
+	if (list.length <= 1) return [[...list]]
+	const output: T[][] = []
+	for (let index = 0; index < list.length; index += 1) {
+		const head = list[index]
+		if (head === undefined) continue
+		const rest = [...list.slice(0, index), ...list.slice(index + 1)]
+		for (const tail of buildPermutations(rest)) output.push([head, ...tail])
+	}
+	return output
+}
+
+/** Build one `Finding` from the members a case cares about, defaulting the rest. */
+export function buildFinding(
+	overrides: Partial<Finding> & Pick<Finding, 'id' | 'pass' | 'rule' | 'effect' | 'applied'>,
+): Finding {
+	return {
+		premises: [],
+		...overrides,
+	}
+}
 
 /** Build a cyclic record for adversarial guard tests. */
 export function buildCyclicRecord(): Record<string, unknown> {
@@ -59,9 +82,9 @@ export function buildGatesDefinition(): QualificationDefinition {
 			createAtom('blocked', 'equals', true),
 		),
 	])
-	return qualificationDefinition('standard', 'Standard eligibility', [gates], {
+	return createQualificationDefinition('standard', 'Standard eligibility', [gates], {
 		rulings: [
-			rulingDefinition('license', 'gates', 'licensed', 'restriction', {
+			createRuling('license', 'gates', 'licensed', 'restriction', {
 				message: 'A license is required',
 			}),
 		],
@@ -77,9 +100,9 @@ export function buildReferralDefinition(): QualificationDefinition {
 			createAtom('flagged', 'equals', true),
 		),
 	])
-	return qualificationDefinition('referral', 'Referral program', [gates], {
+	return createQualificationDefinition('referral', 'Referral program', [gates], {
 		rulings: [
-			rulingDefinition('flag-coastal', 'gates', 'coastal', 'referral', {
+			createRuling('flag-coastal', 'gates', 'coastal', 'referral', {
 				message: 'Coastal surcharge on {{seats}} seats',
 			}),
 		],
@@ -106,9 +129,9 @@ export function buildCapExcessGatesDefinition(): QualificationDefinition {
 			createAtom('blocked', 'equals', true),
 		),
 	])
-	return qualificationDefinition('property', 'Property eligibility', [cap, excess, gates], {
+	return createQualificationDefinition('property', 'Property eligibility', [cap, excess, gates], {
 		rulings: [
-			rulingDefinition('tiv', 'gates', 'tiv', 'restriction', {
+			createRuling('tiv', 'gates', 'tiv', 'restriction', {
 				message: 'Cap is {{qualification.cap}}',
 			}),
 		],
@@ -120,9 +143,9 @@ export function buildScopedWindDefinition(): QualificationDefinition {
 	const wind = createLogicalDefinition('wind', 'Wind eligibility', [
 		createRule('coastal', [createAtom('distance', 'to', 2)], createAtom('blocked', 'equals', true)),
 	])
-	return qualificationDefinition('property', 'Property eligibility', [wind], {
+	return createQualificationDefinition('property', 'Property eligibility', [wind], {
 		rulings: [
-			rulingDefinition('coastal', 'wind', 'coastal', 'restriction', {
+			createRuling('coastal', 'wind', 'coastal', 'restriction', {
 				scope: 'wind',
 				message: 'Wind coverage is unavailable within two miles of saltwater',
 			}),
@@ -139,9 +162,9 @@ export function buildConditionDefinition(): QualificationDefinition {
 			createAtom('noted', 'equals', true),
 		),
 	])
-	return qualificationDefinition('property', 'Property eligibility', [gates], {
+	return createQualificationDefinition('property', 'Property eligibility', [gates], {
 		rulings: [
-			rulingDefinition('vacant', 'gates', 'vacant', 'condition', {
+			createRuling('vacant', 'gates', 'vacant', 'condition', {
 				scope: 'exWind',
 				message: 'Vacancy terms apply',
 			}),
@@ -166,10 +189,10 @@ export function buildEvidenceSnapshotDefinition(): QualificationDefinition {
 			createAtom('blocked', 'equals', true),
 		),
 	])
-	return qualificationDefinition('snapshot', 'Snapshot', [p1, p2], {
+	return createQualificationDefinition('snapshot', 'Snapshot', [p1, p2], {
 		rulings: [
-			rulingDefinition('r1-finding', 'p2', 'r1', 'condition'),
-			rulingDefinition('r2-finding', 'p2', 'r2', 'condition'),
+			createRuling('r1-finding', 'p2', 'r1', 'condition'),
+			createRuling('r2-finding', 'p2', 'r2', 'condition'),
 		],
 	})
 }
@@ -182,36 +205,56 @@ export function buildContinuingLogicalDefinition(): QualificationDefinition {
 	const after = createQuantitativeDefinition('after', 'After', [
 		createFactorGroup('total', 'sum', [createStaticFactor('base', 1)]),
 	])
-	return qualificationDefinition('continuing', 'Continuing', [gates, after], {
-		rulings: [rulingDefinition('note', 'gates', 'flag', 'condition')],
+	return createQualificationDefinition('continuing', 'Continuing', [gates, after], {
+		rulings: [createRuling('note', 'gates', 'flag', 'condition')],
 	})
+}
+
+/** Logical `gates` pass whose rule reads the dotted string key `qualification.cap`. */
+export function buildDottedFieldDefinition(): QualificationDefinition {
+	const cap = createQuantitativeDefinition('cap', 'Cap', [
+		createFactorGroup('limit', 'sum', [createFieldFactor('total', 'total')]),
+	])
+	const gates = createLogicalDefinition('gates', 'Gates', [
+		createRule(
+			'cap-check',
+			[createAtom('qualification.cap', 'above', 50)],
+			createAtom('blocked', 'equals', true),
+		),
+	])
+	return createQualificationDefinition('property', 'Property', [cap, gates])
+}
+
+/** The operational failure every pass of the failing engine reports. */
+export const FAILING_RESULT: QuantitativeResult = {
+	reasoning: 'quantitative',
+	value: 0,
+	groups: [],
+	count: 0,
+	success: false,
+	trace: ['engine trace'],
+	errors: ['engine boom'],
+}
+
+/** Answer every subject with {@link FAILING_RESULT}, one result per subject reasoned. */
+export function reasonFailing(
+	subjects: readonly Subject[],
+	definition: Definition,
+): readonly ReasonResult[]
+export function reasonFailing(subject: Subject, definition: Definition): ReasonResult
+export function reasonFailing(
+	subject: Subject | readonly Subject[],
+	_definition: Definition,
+): ReasonResult | readonly ReasonResult[] {
+	if (Array.isArray(subject)) return subject.map(() => FAILING_RESULT)
+	return FAILING_RESULT
 }
 
 /** Build an injected reason engine whose every pass fails operationally with a fixed trace/error. */
 export function createFailingEngine(): ReasonInterface {
-	const failingResult: QuantitativeResult = {
-		reasoning: 'quantitative',
-		value: 0,
-		groups: [],
-		count: 0,
-		success: false,
-		trace: ['engine trace'],
-		errors: ['engine boom'],
-	}
-
-	function reason(subjects: readonly Subject[], definition: Definition): readonly ReasonResult[]
-	function reason(subject: Subject, definition: Definition): ReasonResult
-	function reason(
-		subject: Subject | readonly Subject[],
-		_definition: Definition,
-	): ReasonResult | readonly ReasonResult[] {
-		if (Array.isArray(subject)) return subject.map(() => failingResult)
-		return failingResult
-	}
-
 	return {
 		emitter: new Emitter<ReasonEventMap>(),
-		reason,
+		reason: reasonFailing,
 		register: () => {},
 		reasoner: () => undefined,
 		reasoners: () => [],

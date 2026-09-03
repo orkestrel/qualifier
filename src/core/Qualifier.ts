@@ -120,14 +120,14 @@ export class Qualifier implements QualifierInterface {
 	 *
 	 * @example
 	 * ```ts
-	 * import { qualificationDefinition, Qualifier, rulingDefinition } from '@orkestrel/qualifier'
+	 * import { createQualificationDefinition, createRuling, Qualifier } from '@orkestrel/qualifier'
 	 * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
 	 *
 	 * const gates = createLogicalDefinition('gates', 'Eligibility gates', [
 	 *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
 	 * ])
-	 * const definition = qualificationDefinition('standard', 'Standard eligibility', [gates], {
-	 *   rulings: [rulingDefinition('license', 'gates', 'licensed', 'restriction')],
+	 * const definition = createQualificationDefinition('standard', 'Standard eligibility', [gates], {
+	 *   rulings: [createRuling('license', 'gates', 'licensed', 'restriction')],
 	 * })
 	 *
 	 * const qualifier = new Qualifier()
@@ -166,10 +166,10 @@ export class Qualifier implements QualifierInterface {
 	 *
 	 * @example
 	 * ```ts
-	 * import { qualificationDefinition, Qualifier } from '@orkestrel/qualifier'
+	 * import { createQualificationDefinition, Qualifier } from '@orkestrel/qualifier'
 	 *
 	 * const qualifier = new Qualifier()
-	 * qualifier.validate(qualificationDefinition('empty', 'Empty', []))
+	 * qualifier.validate(createQualificationDefinition('empty', 'Empty', []))
 	 * // { valid: true, errors: [], warnings: ['Definition has no passes'] }
 	 * qualifier.destroy()
 	 * ```

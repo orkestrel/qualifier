@@ -24,13 +24,13 @@ export type QualificationProjection = number | boolean | Readonly<Record<string,
 /** Represents the internal projection record stored under `QUALIFICATION_KEY`. */
 export type QualificationContext = Readonly<Record<string, QualificationProjection>>
 
-/** Carries the optional fields `rulingDefinition` accepts. */
+/** Carries the optional fields `createRuling` accepts. */
 export interface RulingInput {
 	readonly scope?: string
 	readonly message?: string
 }
 
-/** Carries the optional fields `qualificationDefinition` accepts. */
+/** Carries the optional fields `createQualificationDefinition` accepts. */
 export interface QualificationInput {
 	readonly description?: string
 	readonly rulings?: readonly Ruling[]
@@ -128,7 +128,7 @@ export interface QualifierErrorContext {
 	readonly cause?: unknown
 }
 
-/** Represents the push observation surface of a {@link QualifierInterface} (AGENTS §13). */
+/** Represents the push observation surface of a {@link QualifierInterface}. */
 export type QualifierEventMap = {
 	readonly derive: readonly [derivation: Derivation]
 	readonly finding: readonly [finding: Finding]
@@ -136,7 +136,17 @@ export type QualifierEventMap = {
 	readonly destroy: readonly []
 }
 
-/** Carries the options for `createQualifier` / the `Qualifier` constructor. */
+/**
+ * Carries the options for `createQualifier` / the `Qualifier` constructor.
+ *
+ * @remarks
+ * `engine` injects a reason engine that stays caller-owned and is never destroyed; an
+ * absent `engine` makes the qualifier create and own one. `validate` runs semantic
+ * validation before every qualification. Default: `true`. `labels` overrides the display
+ * name of a premise field, keyed by the dot-joined field path `formatField` produces, and
+ * takes precedence over a premise's own `label`. `on` carries the initial emitter hooks,
+ * and `error` handles a listener throw.
+ */
 export interface QualifierOptions {
 	readonly engine?: ReasonInterface
 	readonly validate?: boolean
@@ -169,14 +179,14 @@ export interface QualifierInterface {
 	 *
 	 * @example
 	 * ```ts
-	 * import { createQualifier, qualificationDefinition, rulingDefinition } from '@orkestrel/qualifier'
+	 * import { createQualificationDefinition, createQualifier, createRuling } from '@orkestrel/qualifier'
 	 * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
 	 *
 	 * const gates = createLogicalDefinition('gates', 'Eligibility gates', [
 	 *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
 	 * ])
-	 * const definition = qualificationDefinition('standard', 'Standard eligibility', [gates], {
-	 *   rulings: [rulingDefinition('license', 'gates', 'licensed', 'restriction')],
+	 * const definition = createQualificationDefinition('standard', 'Standard eligibility', [gates], {
+	 *   rulings: [createRuling('license', 'gates', 'licensed', 'restriction')],
 	 * })
 	 *
 	 * const qualifier = createQualifier()
@@ -201,10 +211,10 @@ export interface QualifierInterface {
 	 *
 	 * @example
 	 * ```ts
-	 * import { createQualifier, qualificationDefinition } from '@orkestrel/qualifier'
+	 * import { createQualificationDefinition, createQualifier } from '@orkestrel/qualifier'
 	 *
 	 * const qualifier = createQualifier()
-	 * qualifier.validate(qualificationDefinition('empty', 'Empty', []))
+	 * qualifier.validate(createQualificationDefinition('empty', 'Empty', []))
 	 * // { valid: true, errors: [], warnings: ['Definition has no passes'] }
 	 * qualifier.destroy()
 	 * ```

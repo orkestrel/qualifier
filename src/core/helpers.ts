@@ -5,12 +5,9 @@ import type {
 	Premise,
 	QualificationContext,
 	QualificationDefinition,
-	QualificationEffect,
-	QualificationInput,
 	QualificationPass,
 	QualificationProjection,
 	Ruling,
-	RulingInput,
 } from './types.js'
 import type {
 	Check,
@@ -69,19 +66,19 @@ export function interpolateMessage(
 }
 
 /**
- * Describes a {@link Premise} comparison as a display-neutral verb phrase.
+ * Renders a {@link Premise} comparison as a display-neutral verb phrase.
  *
  * @param comparison - The comparison to describe
  * @returns A display-neutral phrase
  *
  * @example
  * ```ts
- * import { describeComparison } from '@orkestrel/qualifier'
+ * import { renderComparison } from '@orkestrel/qualifier'
  *
- * describeComparison('above') // 'is more than'
+ * renderComparison('above') // 'is more than'
  * ```
  */
-export function describeComparison(comparison: NonNullable<Premise['comparison']>): string {
+export function renderComparison(comparison: NonNullable<Premise['comparison']>): string {
 	switch (comparison) {
 		case 'equals':
 			return 'is'
@@ -122,14 +119,14 @@ export function describeComparison(comparison: NonNullable<Premise['comparison']
  *
  * @example
  * ```ts
- * import { describeValue } from '@orkestrel/qualifier'
+ * import { renderValue } from '@orkestrel/qualifier'
  *
- * describeValue([18, 25, 40]) // '18, 25, 40'
- * describeValue({ minimum: 18, maximum: 65 }) // '18 and 65'
- * describeValue(42) // '42'
+ * renderValue([18, 25, 40]) // '18, 25, 40'
+ * renderValue({ minimum: 18, maximum: 65 }) // '18 and 65'
+ * renderValue(42) // '42'
  * ```
  */
-export function describeValue(value: unknown): string {
+export function renderValue(value: unknown): string {
 	if (Array.isArray(value)) return value.map((entry) => String(entry)).join(', ')
 	if (isBounds(value)) {
 		const sides: string[] = []
@@ -154,24 +151,24 @@ export function describeValue(value: unknown): string {
  *
  * @example
  * ```ts
- * import { describePremise } from '@orkestrel/qualifier'
+ * import { renderPremise } from '@orkestrel/qualifier'
  *
- * describePremise({ field: 'age', comparison: 'above', expected: 18, actual: 25, met: true })
+ * renderPremise({ field: 'age', comparison: 'above', expected: 18, actual: 25, met: true })
  * // 'age is more than 18 → met'
  *
- * describePremise({ description: 'Applicant is enrolled', met: true })
+ * renderPremise({ description: 'Applicant is enrolled', met: true })
  * // 'Applicant is enrolled → met'
  * ```
  */
-export function describePremise(entry: Premise, labels?: Readonly<Record<string, string>>): string {
+export function renderPremise(entry: Premise, labels?: Readonly<Record<string, string>>): string {
 	const status = entry.met === undefined ? 'unknown' : entry.met ? 'met' : 'not met'
 	if (entry.field === undefined || entry.comparison === undefined) {
 		return `${entry.description ?? 'Premise'} → ${status}`
 	}
 	const field = formatField(entry.field)
 	const label = labels?.[field] ?? entry.label ?? field
-	const expected = entry.expected === undefined ? '' : ` ${describeValue(entry.expected)}`
-	return `${label} ${describeComparison(entry.comparison)}${expected} → ${status}`
+	const expected = entry.expected === undefined ? '' : ` ${renderValue(entry.expected)}`
+	return `${label} ${renderComparison(entry.comparison)}${expected} → ${status}`
 }
 
 /**
@@ -185,15 +182,15 @@ export function describePremise(entry: Premise, labels?: Readonly<Record<string,
  *
  * @example
  * ```ts
- * import { premiseCheck } from '@orkestrel/qualifier'
+ * import { checkToPremise } from '@orkestrel/qualifier'
  * import { createCheck } from '@orkestrel/reason'
  *
  * const authored = createCheck('age', 'above', 18)
- * premiseCheck(authored, { field: 'age', actual: 25, met: true })
+ * checkToPremise(authored, { field: 'age', actual: 25, met: true })
  * // { field: 'age', comparison: 'above', expected: 18, actual: 25, met: true }
  * ```
  */
-export function premiseCheck(
+export function checkToPremise(
 	check: Check,
 	result: CheckResult,
 	labels?: Readonly<Record<string, string>>,
@@ -216,7 +213,7 @@ export function premiseCheck(
  * @remarks
  * A reason rule result carries only booleans, so this is the qualifier's own
  * premise-audit projection: each authored premise expression is flattened to its
- * atom leaves via `extractAtoms`, and each leaf's `Check` is re-evaluated through
+ * atom leaves through `extractAtoms`, and each leaf's `Check` is re-evaluated through
  * the injected `evaluator`. A membership check (`any` / `none`) over an EMPTY
  * array value is content-free and is skipped.
  *
@@ -228,19 +225,19 @@ export function premiseCheck(
  *
  * @example
  * ```ts
- * import { logicalPremises } from '@orkestrel/qualifier'
+ * import { ruleToPremises } from '@orkestrel/qualifier'
  * import { createAtom, createEvaluator, createLogicalDefinition, createRule } from '@orkestrel/reason'
  *
  * const gates = createLogicalDefinition('gates', 'Gates', [
  *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
  * ])
  * const evaluator = createEvaluator()
- * const premises = logicalPremises(gates.rules[0], { licensed: false }, evaluator)
+ * const premises = ruleToPremises(gates.rules[0], { licensed: false }, evaluator)
  *
  * premises[0]?.met // true
  * ```
  */
-export function logicalPremises(
+export function ruleToPremises(
 	rule: Rule,
 	working: Subject,
 	evaluator: EvaluatorInterface,
@@ -257,7 +254,7 @@ export function logicalPremises(
 			) {
 				continue
 			}
-			output.push(premiseCheck(check, evaluator.evaluate(check, working), labels))
+			output.push(checkToPremise(check, evaluator.evaluate(check, working), labels))
 		}
 	}
 	return output
@@ -434,7 +431,7 @@ export function mergeQualificationContext(
  *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
  * ])
  * const ruling = { id: 'license', pass: 'gates', rule: 'licensed', effect: 'restriction' as const }
- * const result = { reasoning: 'logical' as const, conclusion: true, rules: [{ id: 'licensed', applied: true, premises: [true], conclusion: true }], count: 1, success: true, trace: [], errors: [] }
+ * const result = { reasoning: 'logical' as const, conclusion: true, rules: [{ id: 'licensed', applied: true, premises: [true] }], count: 1, success: true, trace: [], errors: [] }
  * const finding = rulingToFinding(ruling, gates, result, { licensed: false }, createEvaluator())
  *
  * finding.applied // true
@@ -448,10 +445,10 @@ export function rulingToFinding(
 	evaluator: EvaluatorInterface,
 	labels?: Readonly<Record<string, string>>,
 ): Finding {
-	const entry = result.rules.find((item) => item.id === ruling.rule)
+	const entry = result.rules.find((resolved) => resolved.id === ruling.rule)
 	const applied = entry?.applied ?? false
 	const rule = pass.reasoning === 'logical' ? findRule(pass, ruling.rule) : undefined
-	const premises = rule === undefined ? [] : logicalPremises(rule, subject, evaluator, labels)
+	const premises = rule === undefined ? [] : ruleToPremises(rule, subject, evaluator, labels)
 	return {
 		id: ruling.id,
 		pass: ruling.pass,
@@ -475,7 +472,8 @@ export function rulingToFinding(
  * `failed`.
  *
  * @param findings - The resolved findings
- * @param failed - Whether an operational pass failure occurred
+ * @param failed - If `true`, adds a synthetic `referral` impact so an operational failure
+ * fails closed; if `false`, derives eligibility from the findings alone. Default: `false`
  * @returns The most severe global eligibility
  *
  * @example
@@ -561,14 +559,14 @@ export function deriveScopeEligibilities(
  *
  * @example
  * ```ts
- * import { describeMissingReferences, qualificationDefinition, rulingDefinition } from '@orkestrel/qualifier'
+ * import { createQualificationDefinition, createRuling, describeMissingReferences } from '@orkestrel/qualifier'
  * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
  *
  * const gates = createLogicalDefinition('gates', 'Gates', [
  *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
  * ])
- * const definition = qualificationDefinition('standard', 'Standard', [gates], {
- *   rulings: [rulingDefinition('license', 'gates', 'absent', 'restriction')],
+ * const definition = createQualificationDefinition('standard', 'Standard', [gates], {
+ *   rulings: [createRuling('license', 'gates', 'absent', 'restriction')],
  * })
  *
  * describeMissingReferences(definition)
@@ -651,7 +649,7 @@ export function assertSubject(value: unknown): asserts value is Subject {
  * @remarks
  * A reason `ReasonError('INVALID')` maps to `DEFINITION` (the engine rejected the
  * pass as an invalid definition); `ReasonError('DESTROYED')` maps to `DESTROYED`;
- * every other `ReasonError` code (e.g. `MISSING`) and every non-`ReasonError` throw
+ * every other `ReasonError` code (for example `MISSING`) and every non-`ReasonError` throw
  * (including a `bail: true` reasoner rethrow) maps to `ENGINE`. The original throw
  * is preserved as `context.cause`.
  *
@@ -708,13 +706,13 @@ export function mapEngineError(error: unknown, pass: string): QualifierError {
  *
  * @example
  * ```ts
- * import { describeEmptyLogicalPasses, qualificationDefinition } from '@orkestrel/qualifier'
+ * import { createQualificationDefinition, describeEmptyLogicalPasses } from '@orkestrel/qualifier'
  * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
  *
  * const gates = createLogicalDefinition('gates', 'Gates', [
  *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
  * ])
- * const definition = qualificationDefinition('standard', 'Standard', [gates])
+ * const definition = createQualificationDefinition('standard', 'Standard', [gates])
  *
  * describeEmptyLogicalPasses(definition) // ["Logical pass 'gates' has no rulings"]
  * ```
@@ -744,13 +742,13 @@ export function describeEmptyLogicalPasses(definition: QualificationDefinition):
  *
  * @example
  * ```ts
- * import { describeUnreadDerivations, qualificationDefinition } from '@orkestrel/qualifier'
+ * import { createQualificationDefinition, describeUnreadDerivations } from '@orkestrel/qualifier'
  * import { createFactorGroup, createQuantitativeDefinition, createStaticFactor } from '@orkestrel/reason'
  *
  * const cap = createQuantitativeDefinition('cap', 'TIV cap', [
  *   createFactorGroup('limit', 'sum', [createStaticFactor('base', 500_000)]),
  * ])
- * const definition = qualificationDefinition('standard', 'Standard', [cap])
+ * const definition = createQualificationDefinition('standard', 'Standard', [cap])
  *
  * describeUnreadDerivations(definition) // ["Quantitative pass 'cap' is never read by a later pass"]
  * ```
@@ -789,75 +787,4 @@ export function describeUnreadDerivations(definition: QualificationDefinition): 
 		}
 	})
 	return warnings
-}
-
-/**
- * Builds a {@link QualificationDefinition}.
- *
- * @remarks
- * Returns a fresh top-level definition, omitting absent optional keys;
- * `passes` and `rulings` arrays are copied, and record `metadata` is
- * shallow-copied so nested values are not deep-cloned.
- *
- * @param id - The definition id
- * @param name - The display name
- * @param passes - The ordered qualification passes
- * @param input - Optional description, rulings, and metadata
- * @returns A fresh qualification definition
- *
- * @example
- * ```ts
- * import { qualificationDefinition } from '@orkestrel/qualifier'
- *
- * qualificationDefinition('standard', 'Standard', [gates], { rulings: [ruling] })
- * ```
- */
-export function qualificationDefinition(
-	id: string,
-	name: string,
-	passes: readonly QualificationPass[],
-	input?: QualificationInput,
-): QualificationDefinition {
-	return {
-		id,
-		name,
-		passes: [...passes],
-		...(input?.description === undefined ? {} : { description: input.description }),
-		...(input?.rulings === undefined ? {} : { rulings: [...input.rulings] }),
-		...(input?.metadata === undefined ? {} : { metadata: { ...input.metadata } }),
-	}
-}
-
-/**
- * Builds a {@link Ruling} — one authored consequence for one rule in one pass.
- *
- * @param id - The ruling id
- * @param pass - The logical pass id the rule lives in
- * @param rule - The rule id whose firing this ruling reacts to
- * @param effect - The eligibility impact when the rule fires
- * @param input - Optional selection scope and message template
- * @returns A fresh ruling
- *
- * @example
- * ```ts
- * import { rulingDefinition } from '@orkestrel/qualifier'
- *
- * rulingDefinition('license', 'gates', 'licensed', 'restriction', { message: 'A license is required' })
- * ```
- */
-export function rulingDefinition(
-	id: string,
-	pass: string,
-	rule: string,
-	effect: QualificationEffect,
-	input?: RulingInput,
-): Ruling {
-	return {
-		id,
-		pass,
-		rule,
-		effect,
-		...(input?.scope === undefined ? {} : { scope: input.scope }),
-		...(input?.message === undefined ? {} : { message: input.message }),
-	}
 }

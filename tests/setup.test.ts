@@ -10,6 +10,7 @@ import type { FieldPath } from '@orkestrel/contract'
 import type { QualificationDefinition, QualificationPass } from '@src/core'
 import { describe, expect, it } from 'vitest'
 import { isQualificationDefinition, QUALIFICATION_KEY } from '@src/core'
+import { isObject } from '@orkestrel/contract'
 import { createQuantitativeReasoner, extractAtoms, isLogicalDefinition } from '@orkestrel/reason'
 import { requireValue } from '@orkestrel/test'
 import * as setup from './setup.js'
@@ -19,11 +20,6 @@ const PLACEHOLDER = /\{\{([^{}]+)\}\}/g
 
 /** The nesting depth `tests/src/core/validators.test.ts` drives the guards with. */
 const GUARD_DEPTH = 200
-
-/** Whether a value is a record this proof can walk. */
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-	return typeof value === 'object' && value !== null
-}
 
 /** Whether an export takes no argument, so this proof can call it and classify what it returns. */
 function isBuilder(value: unknown): value is () => unknown {
@@ -53,7 +49,7 @@ function buildDefinition(name: string, builder: () => unknown): QualificationDef
 function collectNesting(record: Readonly<Record<string, unknown>>): readonly unknown[] {
 	const levels: unknown[] = [record]
 	let current: unknown = record
-	while (isRecord(current) && 'nested' in current) {
+	while (isObject(current) && 'nested' in current) {
 		current = current.nested
 		levels.push(current)
 	}
@@ -250,9 +246,41 @@ describe('adversarial records', () => {
 	})
 })
 
+describe('orderings', () => {
+	it('builds every distinct ordering of a list', () => {
+		const orderings = setup.buildPermutations(['a', 'b', 'c'])
+		const spellings = orderings.map((ordering) => ordering.join(''))
+
+		expect(spellings.sort()).toEqual(['abc', 'acb', 'bac', 'bca', 'cab', 'cba'])
+		// Counting the distinct spellings is a second mechanism: it disagrees with the list
+		// whenever one ordering is repeated instead of built.
+		expect(new Set(spellings).size).toBe(orderings.length)
+	})
+
+	it('builds one empty ordering for an empty list and never returns the caller list', () => {
+		const list = ['only']
+		const orderings = setup.buildPermutations(list)
+
+		expect(setup.buildPermutations([])).toEqual([[]])
+		expect(orderings).toEqual([['only']])
+		expect(orderings[0]).not.toBe(list)
+	})
+})
+
 describe('qualification fixtures', () => {
-	it('exports a qualification definition builder', () => {
-		expect(FIXTURES.size).toBeGreaterThan(0)
+	it('exports every qualification definition builder its suites import', () => {
+		expect([...FIXTURES.keys()].sort()).toEqual(
+			[
+				'buildCapExcessGatesDefinition',
+				'buildConditionDefinition',
+				'buildContinuingLogicalDefinition',
+				'buildDottedFieldDefinition',
+				'buildEvidenceSnapshotDefinition',
+				'buildGatesDefinition',
+				'buildReferralDefinition',
+				'buildScopedWindDefinition',
+			].sort(),
+		)
 	})
 
 	it('points every ruling at a logical rule its own definition declares', () => {
@@ -277,12 +305,33 @@ describe('qualification fixtures', () => {
 	})
 
 	it('returns an equal but unshared definition on every call', () => {
-		expect(FIXTURES.size).toBeGreaterThan(0)
 		expect(reportFixtures(inspectFreshness)).toEqual(buildCleanReport())
 	})
 })
 
 describe('failing engine', () => {
+	it('answers one shared failing result per subject reasoned', () => {
+		const pass = requireValue(
+			setup.buildGatesDefinition().passes[0],
+			'the gates fixture declares a pass',
+		)
+
+		expect(setup.FAILING_RESULT).toEqual({
+			reasoning: 'quantitative',
+			value: 0,
+			groups: [],
+			count: 0,
+			success: false,
+			trace: ['engine trace'],
+			errors: ['engine boom'],
+		})
+		expect(setup.reasonFailing({ id: 'subject' }, pass)).toBe(setup.FAILING_RESULT)
+		expect(setup.reasonFailing([{ id: 'first' }, { id: 'second' }], pass)).toEqual([
+			setup.FAILING_RESULT,
+			setup.FAILING_RESULT,
+		])
+	})
+
 	it('fails every pass with the same trace and error', () => {
 		const engine = setup.createFailingEngine()
 		const passes = setup.buildCapExcessGatesDefinition().passes

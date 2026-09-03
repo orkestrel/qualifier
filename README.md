@@ -17,13 +17,13 @@ npm install @orkestrel/qualifier
 
 ## Requirements
 
-- Node.js >= 24
-- ESM (`import`) and CommonJS (`require`) via the `exports` field
+- Node.js >= 22.12.0
+- ESM (`import`) and CommonJS (`require`) through the `exports` field
 
 ## Usage
 
 ```ts
-import { createQualifier, qualificationDefinition, rulingDefinition } from '@orkestrel/qualifier'
+import { createQualificationDefinition, createQualifier, createRuling } from '@orkestrel/qualifier'
 import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
 
 const gates = createLogicalDefinition('gates', 'Eligibility gates', [
@@ -34,9 +34,9 @@ const gates = createLogicalDefinition('gates', 'Eligibility gates', [
 	),
 ])
 
-const definition = qualificationDefinition('standard', 'Standard eligibility', [gates], {
+const definition = createQualificationDefinition('standard', 'Standard eligibility', [gates], {
 	rulings: [
-		rulingDefinition('license', 'gates', 'licensed', 'restriction', {
+		createRuling('license', 'gates', 'licensed', 'restriction', {
 			message: 'A license is required',
 		}),
 	],

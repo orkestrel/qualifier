@@ -1,32 +1,31 @@
+import type { Comparison } from '@orkestrel/reason'
 import { describe, expect, it } from 'vitest'
-import type { Finding } from '@src/core'
 import {
 	assertSubject,
+	checkToPremise,
 	combineEligibilities,
-	describeComparison,
-	describeEmptyLogicalPasses,
-	describeMissingReferences,
-	describePremise,
-	describeUnreadDerivations,
-	describeValue,
+	createQualificationDefinition,
+	createRuling,
 	deriveFindingEligibility,
 	deriveScopeEligibilities,
+	describeEmptyLogicalPasses,
+	describeMissingReferences,
+	describeUnreadDerivations,
 	findRule,
 	hasReservedKey,
 	interpolateMessage,
-	logicalPremises,
 	mapEngineError,
 	mergeQualificationContext,
-	premiseCheck,
-	qualificationDefinition,
+	QUALIFICATION_KEY,
 	qualificationToRecord,
 	quantitativeResultToDerivation,
-	QUALIFICATION_KEY,
 	reasonResultToProjection,
-	rulingDefinition,
+	renderComparison,
+	renderPremise,
+	renderValue,
+	ruleToPremises,
 	rulingToFinding,
 } from '@src/core'
-import type { Comparison } from '@orkestrel/reason'
 import {
 	createAtom,
 	createCheck,
@@ -39,6 +38,7 @@ import {
 	createStaticFactor,
 	ReasonError,
 } from '@orkestrel/reason'
+import { buildFinding, buildPermutations } from '../../setup.js'
 
 const gatesPass = createLogicalDefinition('gates', 'Gates', [
 	createRule(
@@ -48,15 +48,6 @@ const gatesPass = createLogicalDefinition('gates', 'Gates', [
 	),
 ])
 const capPass = createQuantitativeDefinition('cap', 'Cap', [])
-
-function finding(
-	overrides: Partial<Finding> & Pick<Finding, 'id' | 'pass' | 'rule' | 'effect' | 'applied'>,
-): Finding {
-	return {
-		premises: [],
-		...overrides,
-	}
-}
 
 describe('helpers', () => {
 	describe('combineEligibilities', () => {
@@ -78,25 +69,13 @@ describe('helpers', () => {
 			]
 			const severity: Record<string, number> = { eligible: 0, referral: 1, ineligible: 2 }
 
-			function permutations<T>(list: T[]): T[][] {
-				if (list.length <= 1) return [list]
-				const output: T[][] = []
-				for (let index = 0; index < list.length; index += 1) {
-					const head = list[index]
-					if (head === undefined) continue
-					const rest = [...list.slice(0, index), ...list.slice(index + 1)]
-					for (const tail of permutations(rest)) output.push([head, ...tail])
-				}
-				return output
-			}
-
 			for (let mask = 0; mask < 8; mask += 1) {
 				const subset = eligibilities.filter((_entry, index) => (mask & (1 << index)) !== 0)
 				const expected = subset.reduce<'eligible' | 'referral' | 'ineligible'>(
 					(most, entry) => ((severity[entry] ?? 0) > (severity[most] ?? 0) ? entry : most),
 					'eligible',
 				)
-				const permutationList = subset.length === 0 ? [[]] : permutations(subset)
+				const permutationList = subset.length === 0 ? [[]] : buildPermutations(subset)
 				for (const permutation of permutationList) {
 					expect(combineEligibilities(permutation)).toBe(expected)
 				}
@@ -131,7 +110,7 @@ describe('helpers', () => {
 		})
 	})
 
-	describe('describeComparison', () => {
+	describe('renderComparison', () => {
 		const table: ReadonlyArray<readonly [Comparison, string]> = [
 			['equals', 'is'],
 			['not', 'is not'],
@@ -146,31 +125,31 @@ describe('helpers', () => {
 		]
 
 		it.each(table)('renders %s as %s', (comparison, phrase) => {
-			expect(describeComparison(comparison)).toBe(phrase)
+			expect(renderComparison(comparison)).toBe(phrase)
 		})
 	})
 
-	describe('describeValue', () => {
+	describe('renderValue', () => {
 		it('renders arrays', () => {
-			expect(describeValue([18, 25, 40])).toBe('18, 25, 40')
+			expect(renderValue([18, 25, 40])).toBe('18, 25, 40')
 		})
 
 		it('renders bounds', () => {
-			expect(describeValue({ minimum: 18, maximum: 65 })).toBe('18 and 65')
+			expect(renderValue({ minimum: 18, maximum: 65 })).toBe('18 and 65')
 		})
 
 		it('renders scalars', () => {
-			expect(describeValue(42)).toBe('42')
+			expect(renderValue(42)).toBe('42')
 		})
 
 		it('renders empty-ish bounds as an empty string', () => {
-			expect(describeValue({})).toBe('')
+			expect(renderValue({})).toBe('')
 		})
 	})
 
-	describe('describePremise', () => {
+	describe('renderPremise', () => {
 		it('renders a field premise sentence', () => {
-			const sentence = describePremise({
+			const sentence = renderPremise({
 				field: 'age',
 				comparison: 'above',
 				expected: 18,
@@ -181,17 +160,15 @@ describe('helpers', () => {
 		})
 
 		it('renders a description-only premise without met as unknown', () => {
-			expect(describePremise({ description: 'Some description' })).toBe(
-				'Some description → unknown',
-			)
+			expect(renderPremise({ description: 'Some description' })).toBe('Some description → unknown')
 		})
 
 		it('falls back to "Premise" when field and description are both absent, met false', () => {
-			expect(describePremise({ met: false })).toBe('Premise → not met')
+			expect(renderPremise({ met: false })).toBe('Premise → not met')
 		})
 
 		it('renders a label override instead of the field', () => {
-			const sentence = describePremise(
+			const sentence = renderPremise(
 				{ field: 'age', comparison: 'above', expected: 18, actual: 25, met: true },
 				{ age: 'Applicant age' },
 			)
@@ -199,7 +176,7 @@ describe('helpers', () => {
 		})
 
 		it('renders a field premise that was not met', () => {
-			const sentence = describePremise({
+			const sentence = renderPremise({
 				field: 'age',
 				comparison: 'above',
 				expected: 18,
@@ -210,19 +187,19 @@ describe('helpers', () => {
 		})
 
 		it('renders a described premise with met absent as unknown', () => {
-			expect(describePremise({ description: 'Applicant is enrolled' })).toBe(
+			expect(renderPremise({ description: 'Applicant is enrolled' })).toBe(
 				'Applicant is enrolled → unknown',
 			)
 		})
 
 		it('renders a described premise with met false as not met', () => {
-			expect(describePremise({ description: 'Applicant is enrolled', met: false })).toBe(
+			expect(renderPremise({ description: 'Applicant is enrolled', met: false })).toBe(
 				'Applicant is enrolled → not met',
 			)
 		})
 
 		it('renders the checked form when field, comparison, and description are all present, description unused', () => {
-			const sentence = describePremise({
+			const sentence = renderPremise({
 				field: 'age',
 				comparison: 'above',
 				expected: 18,
@@ -234,7 +211,7 @@ describe('helpers', () => {
 		})
 
 		it('renders the described form when field is present without comparison, field name unused', () => {
-			const sentence = describePremise({
+			const sentence = renderPremise({
 				field: 'age',
 				description: 'Applicant is enrolled',
 				met: true,
@@ -256,14 +233,14 @@ describe('helpers', () => {
 
 	describe('describeMissingReferences', () => {
 		it('reports missing pass, non-logical pass, missing rule, and reserved pass id', () => {
-			const definition = qualificationDefinition('bad', 'Bad', [capPass, gatesPass], {
+			const definition = createQualificationDefinition('bad', 'Bad', [capPass, gatesPass], {
 				rulings: [
-					rulingDefinition('missing-pass', 'absent', 'licensed', 'restriction'),
-					rulingDefinition('quant-pass', 'cap', 'base', 'restriction'),
-					rulingDefinition('missing-rule', 'gates', 'absent', 'restriction'),
+					createRuling('missing-pass', 'absent', 'licensed', 'restriction'),
+					createRuling('quant-pass', 'cap', 'base', 'restriction'),
+					createRuling('missing-rule', 'gates', 'absent', 'restriction'),
 				],
 			})
-			const reserved = qualificationDefinition('reserved', 'Reserved', [
+			const reserved = createQualificationDefinition('reserved', 'Reserved', [
 				createQuantitativeDefinition(QUALIFICATION_KEY, 'Reserved', []),
 			])
 			const errors = describeMissingReferences(definition)
@@ -321,7 +298,7 @@ describe('helpers', () => {
 				success: true,
 				trace: [],
 				errors: [],
-				rules: [{ id: 'licensed', applied: true, premises: [true], conclusion: true }],
+				rules: [{ id: 'licensed', applied: true, premises: [true] }],
 			})
 			expect(projection).toEqual({ conclusion: true, blocked: true })
 		})
@@ -356,7 +333,7 @@ describe('helpers', () => {
 				success: true,
 				trace: [],
 				errors: [],
-				rules: [{ id: 'proto', applied: true, premises: [true], conclusion: true }],
+				rules: [{ id: 'proto', applied: true, premises: [true] }],
 			})
 			expect(Object.prototype).toBe(before)
 			expect(Object.hasOwn(Object.prototype, 'polluted')).toBe(false)
@@ -370,7 +347,7 @@ describe('helpers', () => {
 				success: true,
 				trace: [],
 				errors: [],
-				rules: [{ id: 'ghost', applied: true, premises: [true], conclusion: true }],
+				rules: [{ id: 'ghost', applied: true, premises: [true] }],
 			})
 			expect(projection).toEqual({ conclusion: true })
 		})
@@ -420,14 +397,14 @@ describe('helpers', () => {
 	describe('deriveFindingEligibility', () => {
 		it('derives global eligibility from unscoped applied findings', () => {
 			const findings = [
-				finding({
+				buildFinding({
 					id: 'a',
 					pass: 'gates',
 					rule: 'licensed',
 					effect: 'referral',
 					applied: true,
 				}),
-				finding({
+				buildFinding({
 					id: 'b',
 					pass: 'gates',
 					rule: 'blocked',
@@ -440,7 +417,7 @@ describe('helpers', () => {
 
 		it('ignores scoped findings for global eligibility', () => {
 			const findings = [
-				finding({
+				buildFinding({
 					id: 'wind',
 					pass: 'wind',
 					rule: 'coastal',
@@ -460,7 +437,7 @@ describe('helpers', () => {
 	describe('deriveScopeEligibilities', () => {
 		it('groups scoped findings by severity', () => {
 			const findings = [
-				finding({
+				buildFinding({
 					id: 'wind',
 					pass: 'wind',
 					rule: 'coastal',
@@ -468,7 +445,7 @@ describe('helpers', () => {
 					applied: true,
 					scope: 'wind',
 				}),
-				finding({
+				buildFinding({
 					id: 'ex',
 					pass: 'gates',
 					rule: 'vacant',
@@ -485,7 +462,7 @@ describe('helpers', () => {
 
 		it('combines two findings in the same scope by severity', () => {
 			const findings = [
-				finding({
+				buildFinding({
 					id: 'wind-a',
 					pass: 'wind',
 					rule: 'coastal',
@@ -493,7 +470,7 @@ describe('helpers', () => {
 					applied: true,
 					scope: 'wind',
 				}),
-				finding({
+				buildFinding({
 					id: 'wind-b',
 					pass: 'wind',
 					rule: 'flood',
@@ -507,7 +484,7 @@ describe('helpers', () => {
 
 		it('ignores a non-applied finding and an unscoped finding', () => {
 			const findings = [
-				finding({
+				buildFinding({
 					id: 'not-applied',
 					pass: 'wind',
 					rule: 'coastal',
@@ -515,7 +492,7 @@ describe('helpers', () => {
 					applied: false,
 					scope: 'wind',
 				}),
-				finding({
+				buildFinding({
 					id: 'unscoped',
 					pass: 'gates',
 					rule: 'licensed',
@@ -527,7 +504,7 @@ describe('helpers', () => {
 		})
 	})
 
-	describe('logicalPremises / premiseCheck / rulingToFinding', () => {
+	describe('ruleToPremises / checkToPremise / rulingToFinding', () => {
 		it('returns 0 premises for an empty membership value', () => {
 			const gates = createLogicalDefinition('gates', 'Gates', [
 				createRule(
@@ -540,11 +517,11 @@ describe('helpers', () => {
 			const membership = findRule(gates, 'membership')
 			expect(membership).toBeDefined()
 			const rulePremises =
-				membership === undefined ? [] : logicalPremises(membership, { tag: 'coastal' }, evaluator)
+				membership === undefined ? [] : ruleToPremises(membership, { tag: 'coastal' }, evaluator)
 			expect(rulePremises).toHaveLength(0)
 		})
 
-		it('returns 1 premise for a non-empty membership check, met via a real evaluator', () => {
+		it('returns 1 premise for a non-empty membership check, met through a real evaluator', () => {
 			const gates = createLogicalDefinition('gates', 'Gates', [
 				createRule(
 					'membership',
@@ -556,32 +533,32 @@ describe('helpers', () => {
 			const membership = findRule(gates, 'membership')
 			expect(membership).toBeDefined()
 			const rulePremises =
-				membership === undefined ? [] : logicalPremises(membership, { tag: 'coastal' }, evaluator)
+				membership === undefined ? [] : ruleToPremises(membership, { tag: 'coastal' }, evaluator)
 			expect(rulePremises).toHaveLength(1)
 			expect(rulePremises[0]?.met).toBe(true)
 		})
 
-		it('premiseCheck includes label only when labels[field] is set', () => {
+		it('checkToPremise includes label only when labels[field] is set', () => {
 			const evaluator = createEvaluator()
 			const authored = createCheck('age', 'above', 18)
-			const withoutLabel = premiseCheck(authored, evaluator.evaluate(authored, { age: 25 }))
+			const withoutLabel = checkToPremise(authored, evaluator.evaluate(authored, { age: 25 }))
 			expect('label' in withoutLabel).toBe(false)
-			const withLabel = premiseCheck(authored, evaluator.evaluate(authored, { age: 25 }), {
+			const withLabel = checkToPremise(authored, evaluator.evaluate(authored, { age: 25 }), {
 				age: 'Applicant age',
 			})
 			expect(withLabel.label).toBe('Applicant age')
 		})
 
-		it('premiseCheck carries met and actual through for an unmet check', () => {
+		it('checkToPremise carries met and actual through for an unmet check', () => {
 			const evaluator = createEvaluator()
 			const authored = createCheck('age', 'above', 18)
-			const premise = premiseCheck(authored, evaluator.evaluate(authored, { age: 12 }))
+			const premise = checkToPremise(authored, evaluator.evaluate(authored, { age: 12 }))
 			expect(premise.met).toBe(false)
 			expect(premise.actual).toBe(12)
 		})
 
 		it('rulingToFinding returns premises [] and applied false when the rule is absent', () => {
-			const ruling = rulingDefinition('missing', 'gates', 'absent', 'restriction')
+			const ruling = createRuling('missing', 'gates', 'absent', 'restriction')
 			const found = rulingToFinding(
 				ruling,
 				gatesPass,
@@ -602,7 +579,7 @@ describe('helpers', () => {
 		})
 
 		it('rulingToFinding omits scope and message when the ruling lacks them', () => {
-			const ruling = rulingDefinition('license', 'gates', 'licensed', 'restriction')
+			const ruling = createRuling('license', 'gates', 'licensed', 'restriction')
 			const found = rulingToFinding(
 				ruling,
 				gatesPass,
@@ -613,23 +590,13 @@ describe('helpers', () => {
 					success: true,
 					trace: [],
 					errors: [],
-					rules: [{ id: 'licensed', applied: true, premises: [true], conclusion: true }],
+					rules: [{ id: 'licensed', applied: true, premises: [true] }],
 				},
 				{ licensed: false },
 				createEvaluator(),
 			)
 			expect('scope' in found).toBe(false)
 			expect('message' in found).toBe(false)
-		})
-	})
-
-	describe('hasReservedKey/assertSubject', () => {
-		it('hasReservedKey returns false for a plain subject', () => {
-			expect(hasReservedKey({ id: 'a' })).toBe(false)
-		})
-
-		it('assertSubject does not throw for a valid subject', () => {
-			expect(() => assertSubject({ id: 'a' })).not.toThrow()
 		})
 	})
 
@@ -670,15 +637,15 @@ describe('helpers', () => {
 
 	describe('describeEmptyLogicalPasses', () => {
 		it('warns for a logical pass carrying no ruling', () => {
-			const definition = qualificationDefinition('standard', 'Standard', [gatesPass])
+			const definition = createQualificationDefinition('standard', 'Standard', [gatesPass])
 			expect(describeEmptyLogicalPasses(definition)).toEqual([
 				"Logical pass 'gates' has no rulings",
 			])
 		})
 
 		it('returns [] when every logical pass has a ruling', () => {
-			const definition = qualificationDefinition('standard', 'Standard', [gatesPass], {
-				rulings: [rulingDefinition('license', 'gates', 'licensed', 'restriction')],
+			const definition = createQualificationDefinition('standard', 'Standard', [gatesPass], {
+				rulings: [createRuling('license', 'gates', 'licensed', 'restriction')],
 			})
 			expect(describeEmptyLogicalPasses(definition)).toEqual([])
 		})
@@ -696,7 +663,7 @@ describe('helpers', () => {
 					createAtom('blocked', 'equals', true),
 				),
 			])
-			const definition = qualificationDefinition('standard', 'Standard', [cap, gates])
+			const definition = createQualificationDefinition('standard', 'Standard', [cap, gates])
 			expect(describeUnreadDerivations(definition)).toEqual([])
 		})
 
@@ -707,7 +674,7 @@ describe('helpers', () => {
 			const excess = createQuantitativeDefinition('excess', 'Excess', [
 				createFactorGroup('excess', 'sum', [createFieldFactor('cap', ['qualification', 'cap'])]),
 			])
-			const definition = qualificationDefinition('standard', 'Standard', [cap, excess])
+			const definition = createQualificationDefinition('standard', 'Standard', [cap, excess])
 			expect(describeUnreadDerivations(definition)).not.toContain(
 				"Quantitative pass 'cap' is never read by a later pass",
 			)
@@ -717,7 +684,7 @@ describe('helpers', () => {
 			const cap = createQuantitativeDefinition('cap', 'Cap', [
 				createFactorGroup('limit', 'sum', [createStaticFactor('base', 100)]),
 			])
-			const definition = qualificationDefinition('standard', 'Standard', [cap])
+			const definition = createQualificationDefinition('standard', 'Standard', [cap])
 			expect(describeUnreadDerivations(definition)).toEqual([
 				"Quantitative pass 'cap' is never read by a later pass",
 			])
