@@ -20,7 +20,7 @@ import {
 	createTransform,
 } from '@orkestrel/reason'
 
-/** Build every ordering of a list, so a case can drive an order-independent helper with each. */
+/** Builds every ordering of a list, so a case can drive an order-independent helper with each. */
 export function buildPermutations<T>(list: readonly T[]): readonly T[][] {
 	if (list.length <= 1) return [[...list]]
 	const output: T[][] = []
@@ -33,7 +33,7 @@ export function buildPermutations<T>(list: readonly T[]): readonly T[][] {
 	return output
 }
 
-/** Build one `Finding` from the members a case cares about, defaulting the rest. */
+/** Builds one `Finding` from the members a case cares about, defaulting the rest. */
 export function buildFinding(
 	overrides: Partial<Finding> & Pick<Finding, 'id' | 'pass' | 'rule' | 'effect' | 'applied'>,
 ): Finding {
@@ -43,14 +43,14 @@ export function buildFinding(
 	}
 }
 
-/** Build a cyclic record for adversarial guard tests. */
+/** Builds a cyclic record for adversarial guard tests. */
 export function buildCyclicRecord(): Record<string, unknown> {
 	const record: Record<string, unknown> = { id: 'cycle' }
 	record.self = record
 	return record
 }
 
-/** Build a deeply nested record for adversarial guard tests. */
+/** Builds a deeply nested record for adversarial guard tests. */
 export function buildDeepRecord(depth: number): Record<string, unknown> {
 	let current: Record<string, unknown> = { value: 'leaf' }
 	for (let index = 0; index < depth; index += 1) {
@@ -59,7 +59,7 @@ export function buildDeepRecord(depth: number): Record<string, unknown> {
 	return current
 }
 
-/** Build a null-prototype record carrying an own `__proto__` key for guard tests. */
+/** Builds a null-prototype record carrying an own `__proto__` key for guard tests. */
 export function buildHostileRecord(): Record<string, unknown> {
 	const record: Record<string, unknown> = Object.assign(Object.create(null), { id: 'hostile' })
 	// An object-literal `__proto__:` key sets the prototype instead of creating an own key, so this
@@ -73,7 +73,7 @@ export function buildHostileRecord(): Record<string, unknown> {
 	return record
 }
 
-/** Licensed-gate logical pass with an unscoped restriction ruling. */
+/** Builds a licensed-gate logical pass with an unscoped restriction ruling. */
 export function buildGatesDefinition(): QualificationDefinition {
 	const gates = createLogicalDefinition('gates', 'Eligibility gates', [
 		createRule(
@@ -91,7 +91,7 @@ export function buildGatesDefinition(): QualificationDefinition {
 	})
 }
 
-/** Coastal referral ruling with seat-count message interpolation. */
+/** Builds a coastal referral ruling with seat-count message interpolation. */
 export function buildReferralDefinition(): QualificationDefinition {
 	const gates = createLogicalDefinition('gates', 'Coastal gates', [
 		createRule(
@@ -109,7 +109,7 @@ export function buildReferralDefinition(): QualificationDefinition {
 	})
 }
 
-/** Quantitative cap and excess passes followed by a logical TIV gate. */
+/** Builds quantitative cap and excess passes followed by a logical TIV gate. */
 export function buildCapExcessGatesDefinition(): QualificationDefinition {
 	const cap = createQuantitativeDefinition('cap', 'TIV cap', [
 		createFactorGroup('limit', 'sum', [createStaticFactor('base', 1_010_000)]),
@@ -138,7 +138,7 @@ export function buildCapExcessGatesDefinition(): QualificationDefinition {
 	})
 }
 
-/** Scoped wind restriction leaving global eligibility eligible. */
+/** Builds a scoped wind restriction leaving global eligibility eligible. */
 export function buildScopedWindDefinition(): QualificationDefinition {
 	const wind = createLogicalDefinition('wind', 'Wind eligibility', [
 		createRule('coastal', [createAtom('distance', 'to', 2)], createAtom('blocked', 'equals', true)),
@@ -153,7 +153,7 @@ export function buildScopedWindDefinition(): QualificationDefinition {
 	})
 }
 
-/** Scoped condition ruling that keeps the scope eligible. */
+/** Builds a scoped condition ruling that keeps the scope eligible. */
 export function buildConditionDefinition(): QualificationDefinition {
 	const gates = createLogicalDefinition('gates', 'Eligibility gates', [
 		createRule(
@@ -172,7 +172,7 @@ export function buildConditionDefinition(): QualificationDefinition {
 	})
 }
 
-/** Multi-pass definition proving evidence snapshots for cross-pass and same-pass premises. */
+/** Builds a multi-pass definition proving evidence snapshots for cross-pass and same-pass premises. */
 export function buildEvidenceSnapshotDefinition(): QualificationDefinition {
 	const p1 = createQuantitativeDefinition('p1', 'Pass 1', [
 		createFactorGroup('value', 'sum', [createStaticFactor('base', 42)]),
@@ -197,7 +197,7 @@ export function buildEvidenceSnapshotDefinition(): QualificationDefinition {
 	})
 }
 
-/** Logical `gates` pass with a continuing condition ruling, followed by a quantitative `after` pass. */
+/** Builds a logical `gates` pass with a continuing condition ruling, followed by a quantitative `after` pass. */
 export function buildContinuingLogicalDefinition(): QualificationDefinition {
 	const gates = createLogicalDefinition('gates', 'Gates', [
 		createRule('flag', [createAtom('flag', 'equals', true)], createAtom('noted', 'equals', true)),
@@ -210,7 +210,7 @@ export function buildContinuingLogicalDefinition(): QualificationDefinition {
 	})
 }
 
-/** Logical `gates` pass whose rule reads the dotted string key `qualification.cap`. */
+/** Builds a logical `gates` pass whose rule reads the dotted string key `qualification.cap`. */
 export function buildDottedFieldDefinition(): QualificationDefinition {
 	const cap = createQuantitativeDefinition('cap', 'Cap', [
 		createFactorGroup('limit', 'sum', [createFieldFactor('total', 'total')]),
@@ -225,7 +225,7 @@ export function buildDottedFieldDefinition(): QualificationDefinition {
 	return createQualificationDefinition('property', 'Property', [cap, gates])
 }
 
-/** The operational failure every pass of the failing engine reports. */
+/** Represents the operational failure every pass of the failing engine reports. */
 export const FAILING_RESULT: QuantitativeResult = {
 	reasoning: 'quantitative',
 	value: 0,
@@ -236,7 +236,7 @@ export const FAILING_RESULT: QuantitativeResult = {
 	errors: ['engine boom'],
 }
 
-/** Answer every subject with {@link FAILING_RESULT}, one result per subject reasoned. */
+/** Answers every subject with {@link FAILING_RESULT}, one result per subject reasoned. */
 export function reasonFailing(
 	subjects: readonly Subject[],
 	definition: Definition,
@@ -250,7 +250,7 @@ export function reasonFailing(
 	return FAILING_RESULT
 }
 
-/** Build an injected reason engine whose every pass fails operationally with a fixed trace/error. */
+/** Builds an injected reason engine whose every pass fails operationally with a fixed trace/error. */
 export function createFailingEngine(): ReasonInterface {
 	return {
 		emitter: new Emitter<ReasonEventMap>(),
