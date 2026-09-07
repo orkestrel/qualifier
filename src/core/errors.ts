@@ -1,7 +1,8 @@
 import type { QualifierErrorCode, QualifierErrorContext } from './types.js'
 
 /**
- * Represents a coded programmer error thrown by the qualifier layer.
+ * Represents a coded programmer error thrown by the qualifier layer, carrying a
+ * `QualifierErrorCode` and an optional context record.
  *
  * @remarks
  * `DEFINITION` — a qualification definition failed semantic validation; when

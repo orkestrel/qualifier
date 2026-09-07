@@ -1,13 +1,15 @@
 # @orkestrel/qualifier
 
-A typed **eligibility engine** over [`@orkestrel/reason`](https://github.com/orkestrel/reason):
-authored **passes** — quantitative derivations and logical rule gates — run in order
-against a **subject** (a plain data record) to produce **findings** (evidence-rich
-ruling outcomes), **derivations** (quantitative audit trails), and **eligibility**
-(global plus per-scope). The caller supplies the definition; `Qualifier` only
-evaluates what it is given. Qualification never mutates its inputs — every result is
-a fresh object. Environment-agnostic — no I/O, no browser or server assumptions.
-Part of the `@orkestrel` line.
+> A synchronous, deterministic eligibility engine that runs a pure,
+> JSON-serializable `QualificationDefinition`'s ordered `passes` against one
+> subject through one `@orkestrel/reason` engine and returns a fresh
+> `QualificationResult` carrying global and scoped eligibility, evidence-rich
+> `findings`, and quantitative `derivations`.
+
+Author the passes — quantitative derivations and logical rule gates — hand a subject
+(a plain data record) to `qualify`, and read what comes back. The caller supplies the
+definition; `Qualifier` only evaluates what it is given. Environment-agnostic — no
+I/O, no browser or server assumptions. Part of the `@orkestrel` line.
 
 ## Install
 

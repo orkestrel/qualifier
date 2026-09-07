@@ -47,7 +47,8 @@ import {
  *
  * @remarks
  * The engine is OWNED when self-created (destroyed on `destroy()`) and borrowed
- * when injected (never destroyed). `qualify` builds its working subject through
+ * when injected (never destroyed). Semantic validation runs before the first pass
+ * whenever the `validate` option is on. `qualify` builds its working subject through
  * copy-on-write overlays only — the caller's `subject` is never mutated, and the
  * qualifier's internal projection is discarded after each call.
  */

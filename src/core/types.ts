@@ -48,10 +48,13 @@ export interface Ruling {
 }
 
 /**
- * Represents display-neutral evidence for one condition, in one of two authoring modes.
- * A CHECKED premise carries `field` and `comparison`; a DESCRIBED premise
+ * Represents display-neutral evidence for one condition, authored as a checked or a
+ * described premise.
+ *
+ * @remarks
+ * A checked premise carries `field` and `comparison`; a described premise
  * carries neither and renders from `description` instead. The checked form
- * renders only when `field` and `comparison` are BOTH present, and
+ * renders only when `field` and `comparison` are both present, and
  * `description` then goes unused; a premise missing either half of the
  * checked pair renders as described instead. `met` is three-state: `true`
  * (met), `false` (not met), or absent (not evaluated, rendered as unknown).
@@ -137,7 +140,7 @@ export type QualifierEventMap = {
 }
 
 /**
- * Carries the options for `createQualifier` / the `Qualifier` constructor.
+ * Carries the options for `createQualifier` and the `Qualifier` constructor.
  *
  * @remarks
  * `engine` injects a reason engine that stays caller-owned and is never destroyed; an

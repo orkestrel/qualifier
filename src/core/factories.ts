@@ -11,7 +11,7 @@ import type {
 import { Qualifier } from './Qualifier.js'
 
 /**
- * Creates one qualifier over a reason engine.
+ * Creates one {@link QualifierInterface} over a reason engine.
  *
  * @remarks
  * A standalone qualifier creates and OWNS one shared quantitative-plus-logical
@@ -24,12 +24,25 @@ import { Qualifier } from './Qualifier.js'
  * @param options - Optional injected engine, validation, labels, and emitter hooks
  * @returns A {@link QualifierInterface}
  *
- * @example
+ * @example Create a qualifier
  * ```ts
- * import { createQualifier } from '@orkestrel/qualifier'
+ * import { createQualificationDefinition, createQualifier, createRuling } from '@orkestrel/qualifier'
+ * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
+ *
+ * const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+ * 	createRule(
+ * 		'licensed',
+ * 		[createAtom('licensed', 'equals', false)],
+ * 		createAtom('blocked', 'equals', true),
+ * 	),
+ * ])
+ *
+ * const definition = createQualificationDefinition('standard', 'Standard eligibility', [gates], {
+ * 	rulings: [createRuling('license', 'gates', 'licensed', 'restriction')],
+ * })
  *
  * const qualifier = createQualifier()
- * qualifier.qualify({ id: 'risk-1' }, definition)
+ * qualifier.qualify({ id: 'risk-1', licensed: false }, definition)
  * qualifier.destroy()
  * ```
  */
@@ -38,10 +51,9 @@ export function createQualifier(options?: QualifierOptions): QualifierInterface 
 }
 
 /**
- * Creates a {@link QualificationDefinition}.
+ * Creates a fresh {@link QualificationDefinition}, omitting every absent optional key.
  *
  * @remarks
- * Returns a fresh top-level definition, omitting absent optional keys;
  * `passes` and `rulings` arrays are copied, and record `metadata` is
  * shallow-copied so nested values are not deep-cloned.
  *
@@ -75,7 +87,7 @@ export function createQualificationDefinition(
 }
 
 /**
- * Creates a {@link Ruling} — one authored consequence for one rule in one pass.
+ * Builds a fresh {@link Ruling} from the rule it reacts to and the effect it applies.
  *
  * @param id - The ruling id
  * @param pass - The logical pass id the rule lives in

@@ -29,6 +29,10 @@ import {
 /**
  * Determines whether a value is an {@link Eligibility} literal.
  *
+ * @remarks
+ * The guard is total and leaves nothing unchecked: a scalar union has no open or exact
+ * axis.
+ *
  * @param value - The value to test
  * @returns True if `value` is one of the eligibility literals; false otherwise
  */
@@ -36,6 +40,10 @@ export const isEligibility = literalOf('eligible', 'ineligible', 'referral')
 
 /**
  * Determines whether a value is a {@link QualificationEffect} literal.
+ *
+ * @remarks
+ * The guard is total and leaves nothing unchecked: a scalar union has no open or exact
+ * axis.
  *
  * @param value - The value to test
  * @returns True if `value` is one of the effect literals; false otherwise
@@ -46,8 +54,9 @@ export const isQualificationEffect = literalOf('restriction', 'referral', 'condi
  * Determines whether a value is an open string-keyed record of {@link Eligibility} values.
  *
  * @remarks
- * Every own string-named property is checked, including non-enumerable properties. Inherited and
- * symbol-named members are left unchecked because they are outside the record this guard certifies.
+ * Every own string-named value is checked through {@link isEligibility}, including
+ * non-enumerable values. Inherited and symbol-named members are left unchecked because they
+ * are outside the own string-keyed record this guard certifies.
  *
  * @param value - The value to test
  * @returns True if `value` is a non-array object whose own string-named values are
@@ -65,9 +74,11 @@ export function isEligibilityRecord(
  * Determines whether a value is an open result-side {@link Premise}.
  *
  * @remarks
- * `expected` is unchecked and may be absent or contain any value because its published type is
- * `unknown`. `actual` is unchecked and may be absent or contain any value for the same reason.
- * Unknown members are admitted.
+ * The optional `field`, `label`, `description`, `comparison`, and `met` members are checked
+ * when they are defined. `expected` is unchecked and may be absent or contain any value
+ * because its published type is `unknown`. `actual` is unchecked and may be absent or contain
+ * any value for the same reason. Unknown members are admitted, because an open result admits
+ * what the published contract does not name.
  *
  * @param value - The value to test
  * @returns True if every checked premise member follows its published type; false otherwise
@@ -89,8 +100,10 @@ export function isPremise(value: unknown): value is Premise {
  * Determines whether a value is an open result-side {@link Finding}.
  *
  * @remarks
- * Unknown members are admitted. Optional `scope` and `message` members may be absent or
- * `undefined`; a present defined value must be a string.
+ * Every published member is checked, including each nested {@link Premise}. Optional `scope`
+ * and `message` members may be absent or `undefined`; a present defined value must be a
+ * string. Unknown members are admitted, because a foreign result implementation may add them
+ * without changing the published contract.
  *
  * @param value - The value to test
  * @returns True if every published finding member is valid; false otherwise
@@ -115,8 +128,10 @@ export function isFinding(value: unknown): value is Finding {
  * Determines whether a value is an open result-side {@link Derivation}.
  *
  * @remarks
- * Unknown members are admitted. `value` follows the published `number` type, including `NaN` and
- * infinities.
+ * Every published member is checked: `value` follows the published `number` type, including
+ * `NaN` and the infinities, and `trace` and `errors` hold strings. Unknown members are
+ * admitted, because a foreign result implementation may add them without changing the
+ * published contract.
  *
  * @param value - The value to test
  * @returns True if every published derivation member is valid; false otherwise
@@ -136,7 +151,10 @@ export function isDerivation(value: unknown): value is Derivation {
  *
  * @remarks
  * This guard is result-postured for values returned through a borrowed qualifier interface. It
- * admits unknown members and class instances while checking the complete published result closure.
+ * checks the complete published result closure — eligibility, scope values, findings,
+ * derivations, success, and the audit trail — and admits unknown members and class instances,
+ * because a borrowed `QualifierInterface` implementation may add them beyond the
+ * published contract.
  *
  * @param value - The value to test
  * @returns True if every published qualification-result member is valid; false otherwise
@@ -158,6 +176,11 @@ export function isQualificationResult(value: unknown): value is QualificationRes
 /**
  * Determines whether a value is a {@link QualificationPass} (a quantitative or logical definition).
  *
+ * @remarks
+ * The guard is exact and requires either complete reason shape, the quantitative definition or
+ * the logical one. Nothing is left unchecked, because the reason package owns both authored
+ * input shapes.
+ *
  * @param value - The value to test
  * @returns True if `value` is a complete reason quantitative or logical definition; false otherwise
  */
@@ -167,6 +190,10 @@ export function isQualificationPass(value: unknown): value is QualificationPass 
 
 /**
  * Determines whether a value is an exact {@link Ruling} record.
+ *
+ * @remarks
+ * Every authored ruling member and the complete key set are checked. Nothing is left
+ * unchecked, because this package owns the authored input record.
  *
  * @param value - The value to test
  * @returns True if `value` carries every ruling member and no unknown key; false otherwise
@@ -187,6 +214,11 @@ export function isRuling(value: unknown): value is Ruling {
 
 /**
  * Determines whether a value is an exact {@link QualificationDefinition} record.
+ *
+ * @remarks
+ * Every authored definition member, the nested pass and ruling shapes, and the complete key
+ * set are checked. Nothing is left unchecked, because this package owns the authored input
+ * record.
  *
  * @param value - The value to test
  * @returns True if `value` carries every definition member and no unknown key; false otherwise
