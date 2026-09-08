@@ -8,8 +8,11 @@
 
 Author the passes — quantitative derivations and logical rule gates — hand a subject
 (a plain data record) to `qualify`, and read what comes back. The caller supplies the
-definition; `Qualifier` only evaluates what it is given. Environment-agnostic — no
-I/O, no browser or server assumptions. Part of the `@orkestrel` line.
+definition; `Qualifier` only evaluates what it is given. Inject a
+[`@orkestrel/reason`](https://github.com/orkestrel/reason) `ReasonInterface` where
+qualification shares an engine with the rest of your reasoning, and call `destroy()`
+when the qualifier's work is done. Environment-agnostic — no I/O, no browser or
+server assumptions. Part of the `@orkestrel` line.
 
 ## Install
 

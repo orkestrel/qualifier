@@ -36,10 +36,10 @@ import {
  *
  * @remarks
  * Each token is split on `.` into a `FieldPath` array and resolved with
- * `resolveField` (a plain string field is ONE key, never dot-split — the split
+ * `resolveField` (a plain string field is one key, never dot-split — the split
  * here is the token-to-path bridge). A finite number renders with `en-US`
  * thousand grouping (`5010` → `5,010`); any other resolved value String-coerces.
- * An UNRESOLVED path renders as the empty string.
+ * An unresolved path renders as the empty string.
  *
  * @param template - The message template carrying `{{dotted.path}}` tokens
  * @param subject - The record tokens resolve against
@@ -111,7 +111,7 @@ export function renderComparison(comparison: NonNullable<Premise['comparison']>)
  * A reason `Bounds`-shaped record (the `between` / `outside` expected value)
  * renders its present sides joined with the word `and`; an absent side is
  * omitted. A finite number and everything else fall back to plain `String()` —
- * a finite number is NOT grouped here (grouping is {@link interpolateMessage}'s
+ * a finite number is not grouped here (grouping is {@link interpolateMessage}'s
  * message-token-only behavior).
  *
  * @param value - The value to render
@@ -141,7 +141,7 @@ export function renderValue(value: unknown): string {
  * Renders one {@link Premise} into a display-neutral sentence.
  *
  * @remarks
- * The checked form renders only when `field` and `comparison` are BOTH
+ * The checked form renders only when `field` and `comparison` are both
  * present, and `description` then goes unused; a premise missing either half
  * of the checked pair renders as described instead.
  *
@@ -214,7 +214,7 @@ export function checkToPremise(
  * A reason rule result carries only booleans, so this is the qualifier's own
  * premise-audit projection: each authored premise expression is flattened to its
  * atom leaves through `extractAtoms`, and each leaf's `Check` is re-evaluated through
- * the injected `evaluator`. A membership check (`any` / `none`) over an EMPTY
+ * the injected `evaluator`. A membership check (`any` / `none`) over an empty
  * array value is content-free and is skipped.
  *
  * @param rule - The authored rule
@@ -410,7 +410,7 @@ export function mergeQualificationContext(
  *
  * @remarks
  * `applied` reflects whether the ruling's rule fired. Premises are re-evaluated
- * against the SAME subject snapshot the pass evaluated, so a conclusion the pass
+ * against the same subject snapshot the pass evaluated, so a conclusion the pass
  * derived can never satisfy its own reported premise. The message interpolates
  * against that snapshot.
  *

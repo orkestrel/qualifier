@@ -1,6 +1,6 @@
 // The consumer-side guides-parity drop-in: runs `@orkestrel/guide`'s checks against
 // this repo's own `guides/README.md` manifest. The constants that follow are this
-// package's own, and are the only part a sibling package changes.
+// package's own, as is the executed section that closes the file.
 
 import { describe, expect, it } from 'vitest'
 import {
@@ -380,5 +380,36 @@ describe('flagship fences', () => {
 		)
 
 		qualifier.destroy()
+	})
+
+	it('returns what the titled factory fence claims', () => {
+		const gates = createLogicalDefinition('gates', 'Eligibility gates', [
+			createRule(
+				'licensed',
+				[createAtom('licensed', 'equals', false)],
+				createAtom('blocked', 'equals', true),
+			),
+		])
+		const bare = createRuling('license', 'gates', 'licensed', 'restriction')
+		const messaged = createRuling('license', 'gates', 'licensed', 'restriction', {
+			message: 'A license is required',
+		})
+		const passes = [gates]
+		const definition = createQualificationDefinition('standard', 'Standard eligibility', passes, {
+			rulings: [messaged],
+		})
+
+		expect('message' in bare).toBe(false)
+		expect(messaged.message).toBe('A license is required')
+		expect('description' in definition).toBe(false)
+		expect(definition.passes).not.toBe(passes)
+		expect(guideText).toContain(
+			"'message' in bare // false — an absent optional key is omitted, never written as undefined",
+		)
+		expect(guideText).toContain("messaged.message // 'A license is required'")
+		expect(guideText).toContain("'description' in definition // false")
+		expect(guideText).toContain(
+			'definition.passes === passes // false — the factory copies what it is handed',
+		)
 	})
 })

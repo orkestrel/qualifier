@@ -14,7 +14,7 @@ import { Qualifier } from './Qualifier.js'
  * Creates one {@link QualifierInterface} over a reason engine.
  *
  * @remarks
- * A standalone qualifier creates and OWNS one shared quantitative-plus-logical
+ * A standalone qualifier creates and owns one shared quantitative-plus-logical
  * reason engine, destroying it on `destroy()`. An injected `options.engine`
  * remains caller-owned and is never destroyed. `validate` runs semantic
  * validation before every qualification. Default: `true`. `labels` overrides the
@@ -37,9 +37,21 @@ import { Qualifier } from './Qualifier.js'
  * 	),
  * ])
  *
- * const definition = createQualificationDefinition('standard', 'Standard eligibility', [gates], {
- * 	rulings: [createRuling('license', 'gates', 'licensed', 'restriction')],
+ * const bare = createRuling('license', 'gates', 'licensed', 'restriction')
+ * const messaged = createRuling('license', 'gates', 'licensed', 'restriction', {
+ * 	message: 'A license is required',
  * })
+ *
+ * 'message' in bare // false — an absent optional key is omitted, never written as undefined
+ * messaged.message // 'A license is required'
+ *
+ * const passes = [gates]
+ * const definition = createQualificationDefinition('standard', 'Standard eligibility', passes, {
+ * 	rulings: [messaged],
+ * })
+ *
+ * 'description' in definition // false
+ * definition.passes === passes // false — the factory copies what it is handed
  *
  * const qualifier = createQualifier()
  * qualifier.qualify({ id: 'risk-1', licensed: false }, definition)
@@ -87,7 +99,7 @@ export function createQualificationDefinition(
 }
 
 /**
- * Builds a fresh {@link Ruling} from the rule it reacts to and the effect it applies.
+ * Creates a fresh {@link Ruling} from the rule it reacts to and the effect it applies.
  *
  * @param id - The ruling id
  * @param pass - The logical pass id the rule lives in

@@ -7,8 +7,8 @@ import type { Eligibility, QualificationEffect } from './types.js'
 export const DEFAULT_QUALIFIER_VALIDATE = true
 
 /**
- * Names the reserved internal projection namespace a pass's working projection is written
- * under, `'qualification'`.
+ * Names `'qualification'`, the reserved internal projection namespace a pass's working
+ * projection is written under.
  */
 export const QUALIFICATION_KEY = 'qualification'
 

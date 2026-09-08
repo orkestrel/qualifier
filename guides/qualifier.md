@@ -99,7 +99,7 @@ A `Shape` cell holds the constant's declared type.
 | API                          | Kind  | Shape                                                | Summary                                                                                                                                             |
 | ---------------------------- | ----- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DEFAULT_QUALIFIER_VALIDATE` | const | `boolean`                                            | Holds the default definition validation policy for `createQualifier` and `Qualifier.qualify`, `true`.                                               |
-| `QUALIFICATION_KEY`          | const | `string`                                             | Names the reserved internal projection namespace a pass's working projection is written under, `'qualification'`.                                   |
+| `QUALIFICATION_KEY`          | const | `string`                                             | Names `'qualification'`, the reserved internal projection namespace a pass's working projection is written under.                                   |
 | `ELIGIBILITY_PRECEDENCE`     | const | `readonly Eligibility[]`                             | Lists the eligibility severities most to least severe: `ineligible`, `referral`, `eligible`.                                                        |
 | `EFFECT_ELIGIBILITIES`       | const | `Readonly<Record<QualificationEffect, Eligibility>>` | Maps each `QualificationEffect` to its eligibility impact — `restriction` to `ineligible`, `referral` to `referral`, and `condition` to `eligible`. |
 
@@ -147,7 +147,7 @@ arrays where a record is required, returns `false` for hostile reads, and never 
 result belongs to `@orkestrel/reason`, so narrow one with the `isReasonValidationResult` guard from
 that package.
 
-A `Shape` cell holds an interface's data members as bare names in braces, `?` marking an optional member and `plus` introducing its call-signature members, and a type alias's own type literal with a union's arms escaped as `\|`. In a guard table a `Shape` cell holds the type the guard narrows to.
+In a guard table a `Shape` cell holds the type the guard narrows to.
 
 | API                         | Kind     | Shape                                   | Summary                                                                                     |
 | --------------------------- | -------- | --------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -339,9 +339,13 @@ assertSubject({ id: 's1' }) // narrows to Subject; throws QualifierError('MISMAT
 | ------------------------------- | -------- | ------------------------------------------------------------------------------ |
 | `createQualifier`               | function | Creates one `QualifierInterface` over a reason engine.                         |
 | `createQualificationDefinition` | function | Creates a fresh `QualificationDefinition`, omitting every absent optional key. |
-| `createRuling`                  | function | Builds a fresh `Ruling` from the rule it reacts to and the effect it applies.  |
+| `createRuling`                  | function | Creates a fresh `Ruling` from the rule it reacts to and the effect it applies. |
 
 #### Create a qualifier
+
+This fence adds to the quickstart what the factory family itself contributes: the
+optional `message` and `rulings` inputs, and the fresh value each factory returns
+with every absent optional key omitted.
 
 ```ts
 import { createQualificationDefinition, createQualifier, createRuling } from '@orkestrel/qualifier'
@@ -355,9 +359,21 @@ const gates = createLogicalDefinition('gates', 'Eligibility gates', [
 	),
 ])
 
-const definition = createQualificationDefinition('standard', 'Standard eligibility', [gates], {
-	rulings: [createRuling('license', 'gates', 'licensed', 'restriction')],
+const bare = createRuling('license', 'gates', 'licensed', 'restriction')
+const messaged = createRuling('license', 'gates', 'licensed', 'restriction', {
+	message: 'A license is required',
 })
+
+'message' in bare // false — an absent optional key is omitted, never written as undefined
+messaged.message // 'A license is required'
+
+const passes = [gates]
+const definition = createQualificationDefinition('standard', 'Standard eligibility', passes, {
+	rulings: [messaged],
+})
+
+'description' in definition // false
+definition.passes === passes // false — the factory copies what it is handed
 
 const qualifier = createQualifier()
 qualifier.qualify({ id: 'risk-1', licensed: false }, definition)
@@ -622,6 +638,8 @@ const selected = items.filter((item) => {
 
 ### Conditions do not block downstream work
 
+A conditional ruling is authored like a blocking one, with a scope and a message:
+
 ```ts
 const condition = createRuling('vacant', 'gates', 'vacant', 'condition', {
 	scope: 'exWind',
@@ -640,6 +658,8 @@ A `condition` does not block qualification for its scope — it surfaces evidenc
 only. Any downstream status derived from that evidence is outside this package.
 
 ### Referral blocks downstream work
+
+A referral ruling names the review a subject needs, and takes no scope here:
 
 ```ts
 const referral = createRuling('roof', 'gates', 'roof', 'referral', {
@@ -683,6 +703,9 @@ the dot-joined field path — `age`, `qualification.cap` — and the override wi
 premise's own `label`, which in turn wins over the raw path.
 
 ### Observing
+
+The `on` option carries the initial emitter hooks, and `error` handles a listener
+throw:
 
 ```ts
 const qualifier = createQualifier({

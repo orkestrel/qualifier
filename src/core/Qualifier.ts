@@ -46,7 +46,7 @@ import {
  * Runs ordered passes over one reason engine and returns eligibility.
  *
  * @remarks
- * The engine is OWNED when self-created (destroyed on `destroy()`) and borrowed
+ * The engine is owned when self-created (destroyed on `destroy()`) and borrowed
  * when injected (never destroyed). Semantic validation runs before the first pass
  * whenever the `validate` option is on. `qualify` builds its working subject through
  * copy-on-write overlays only — the caller's `subject` is never mutated, and the
