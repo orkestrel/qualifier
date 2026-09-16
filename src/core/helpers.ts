@@ -22,7 +22,7 @@ import type {
 } from '@orkestrel/reason'
 import { EFFECT_ELIGIBILITIES, ELIGIBILITY_PRECEDENCE, QUALIFICATION_KEY } from './constants.js'
 import { QualifierError } from './errors.js'
-import { isFiniteNumber, isRecord, resolveField } from '@orkestrel/contract'
+import { isArray, isError, isFiniteNumber, isRecord, resolveField } from '@orkestrel/contract'
 import {
 	extractAtoms,
 	extractConclusions,
@@ -127,7 +127,7 @@ export function renderComparison(comparison: NonNullable<Premise['comparison']>)
  * ```
  */
 export function renderValue(value: unknown): string {
-	if (Array.isArray(value)) return value.map((entry) => String(entry)).join(', ')
+	if (isArray(value)) return value.map((entry) => String(entry)).join(', ')
 	if (isBounds(value)) {
 		const sides: string[] = []
 		if (value.minimum !== undefined) sides.push(String(value.minimum))
@@ -249,7 +249,7 @@ export function ruleToPremises(
 			const { check } = atom
 			if (
 				(check.operator === 'any' || check.operator === 'none') &&
-				Array.isArray(check.value) &&
+				isArray(check.value) &&
 				check.value.length === 0
 			) {
 				continue
@@ -686,7 +686,7 @@ export function mapEngineError(error: unknown, pass: string): QualifierError {
 			cause: error,
 		})
 	}
-	const message = error instanceof Error ? error.message : String(error)
+	const message = isError(error) ? error.message : String(error)
 	return new QualifierError('ENGINE', `Pass '${pass}' engine failure: ${message}`, {
 		pass,
 		cause: error,

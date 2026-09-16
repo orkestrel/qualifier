@@ -1,4 +1,5 @@
 import type { QualifierErrorCode, QualifierErrorContext } from './types.js'
+import { isInstance } from '@orkestrel/contract'
 
 /**
  * Represents a coded programmer error thrown by the qualifier layer, carrying a
@@ -35,5 +36,5 @@ export class QualifierError extends Error {
  * @returns True if `value` is a {@link QualifierError} instance; false otherwise
  */
 export function isQualifierError(value: unknown): value is QualifierError {
-	return value instanceof QualifierError
+	return isInstance(value, QualifierError)
 }
