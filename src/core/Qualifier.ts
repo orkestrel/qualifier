@@ -3,6 +3,7 @@ import type {
 	Finding,
 	QualificationContext,
 	QualificationDefinition,
+	QualificationPass,
 	QualificationResult,
 	QualifierEventMap,
 	QualifierInterface,
@@ -227,23 +228,22 @@ export class Qualifier implements QualifierInterface {
 
 	#qualify(subject: Subject, definition: QualificationDefinition): QualificationResult {
 		assertSubject(subject)
-		let context: QualificationContext = {}
-		let working: Subject = { ...subject }
+		const steps: Array<{
+			readonly context: QualificationContext
+			readonly subject: Subject
+			readonly success: boolean
+		}> = [{ context: {}, subject: { ...subject }, success: true }]
 		const findings: Finding[] = []
 		const derivations: Derivation[] = []
 		const trace: string[] = []
 		const errors: string[] = []
-		let failed = false
 
 		for (const pass of definition.passes) {
 			this.#alive()
-			const evaluated = working
-			let result: ReasonResult
-			try {
-				result = this.#engine.reason(evaluated, pass)
-			} catch (error) {
-				throw mapEngineError(error, pass.id)
-			}
+			const previous = steps.at(-1)
+			if (previous === undefined) throw new Error('Qualification has no initial step')
+			const evaluated = previous.subject
+			const result = this.#reason(evaluated, pass)
 
 			trace.push(...result.trace.map((entry) => `${pass.id}: ${entry}`))
 			errors.push(...result.errors.map((entry) => `${pass.id}: ${entry}`))
@@ -271,17 +271,18 @@ export class Qualifier implements QualifierInterface {
 			}
 
 			const projection = reasonResultToProjection(pass, result)
-			context = mergeQualificationContext(context, pass.id, projection)
-			working = { ...subject, ...qualificationToRecord(context) }
+			const context = mergeQualificationContext(previous.context, pass.id, projection)
+			steps.push({
+				context,
+				subject: { ...subject, ...qualificationToRecord(context) },
+				success: result.success,
+			})
 
-			if (!result.success) {
-				failed = true
-				break
-			}
+			if (!result.success) break
 			if (deriveFindingEligibility(findings) === 'ineligible') break
 		}
 
-		const success = !failed && errors.length === 0
+		const success = steps.every((step) => step.success) && errors.length === 0
 		const scopes = deriveScopeEligibilities(findings)
 		const qualification: QualificationResult = Object.freeze({
 			id: definition.id,
@@ -296,6 +297,14 @@ export class Qualifier implements QualifierInterface {
 		})
 		this.#emitter.emit('qualify', qualification)
 		return qualification
+	}
+
+	#reason(subject: Subject, pass: QualificationPass): ReasonResult {
+		try {
+			return this.#engine.reason(subject, pass)
+		} catch (error) {
+			throw mapEngineError(error, pass.id)
+		}
 	}
 
 	#alive(): void {

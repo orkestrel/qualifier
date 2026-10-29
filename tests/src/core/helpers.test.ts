@@ -69,7 +69,7 @@ describe('helpers', () => {
 			]
 			const severity: Record<string, number> = { eligible: 0, referral: 1, ineligible: 2 }
 
-			for (let mask = 0; mask < 8; mask += 1) {
+			for (const mask of Array.from({ length: 8 }, (_, index) => index)) {
 				const subset = eligibilities.filter((_entry, index) => (mask & (1 << index)) !== 0)
 				const expected = subset.reduce<'eligible' | 'referral' | 'ineligible'>(
 					(most, entry) => ((severity[entry] ?? 0) > (severity[most] ?? 0) ? entry : most),

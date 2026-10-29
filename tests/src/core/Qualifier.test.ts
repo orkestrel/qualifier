@@ -33,35 +33,9 @@ import {
 	buildReferralDefinition,
 	buildScopedWindDefinition,
 	createFailingEngine,
+	expectNoForbiddenKeys,
+	matchesFieldPath,
 } from '../../setup.js'
-
-const FORBIDDEN_RESULT_KEYS: readonly string[] = [
-	'amount',
-	'authority',
-	'aggregate',
-	'outcome',
-	'worksheet',
-	'total',
-	'notice',
-	'status',
-	'decision',
-]
-
-function expectNoForbiddenKeys(value: unknown, path = 'result'): void {
-	if (value === null || typeof value !== 'object') return
-	for (const key of FORBIDDEN_RESULT_KEYS) {
-		expect(Object.hasOwn(value, key), `${path}.${key}`).toBe(false)
-	}
-	if (Array.isArray(value)) {
-		for (const [index, entry] of value.entries()) {
-			expectNoForbiddenKeys(entry, `${path}[${index}]`)
-		}
-		return
-	}
-	for (const [key, entry] of Object.entries(value)) {
-		expectNoForbiddenKeys(entry, `${path}.${key}`)
-	}
-}
 
 describe('Qualifier', () => {
 	describe('referral finding and message interpolation', () => {
@@ -512,7 +486,7 @@ describe('Qualifier', () => {
 				'success',
 				'trace',
 			])
-			expectNoForbiddenKeys(result)
+			expectNoForbiddenKeys(result, (actual) => expect(actual).toBe(false))
 			qualifier.destroy()
 		})
 	})
@@ -824,16 +798,3 @@ describe('Qualifier', () => {
 		})
 	})
 })
-
-function matchesFieldPath(
-	field: string | readonly string[] | undefined,
-	expected: readonly string[],
-): boolean {
-	if (field === undefined) return false
-	if (Array.isArray(field)) {
-		return (
-			field.length === expected.length && field.every((part, index) => part === expected[index])
-		)
-	}
-	return field === expected.join('.')
-}

@@ -120,6 +120,10 @@ and `context.cause` preserves the original throw. A `DEFINITION`/`INVALID` or
 `DESTROYED` engine throw maps to the matching code instead, and a `DEFINITION` throw
 raised by `qualify`'s own validation carries `context.definition`.
 
+The guard recognizes the error's own identity brand across package copies and module
+formats. It accepts subclasses regardless of their `name` and refuses transparent
+proxies, unbranded look-alikes, and plain branded objects.
+
 ```ts
 import { isQualifierError, QualifierError } from '@orkestrel/qualifier'
 

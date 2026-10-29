@@ -1,5 +1,5 @@
 import type { QualifierErrorCode, QualifierErrorContext } from './types.js'
-import { isInstance } from '@orkestrel/contract'
+import { holds, INTRINSICS, isObject } from '@orkestrel/contract'
 
 /**
  * Represents a coded programmer error thrown by the qualifier layer, carrying a
@@ -23,6 +23,7 @@ export class QualifierError extends Error {
 
 	constructor(code: QualifierErrorCode, message: string, context?: QualifierErrorContext) {
 		super(message)
+		INTRINSICS.define(this, Symbol.for('@orkestrel/qualifier.QualifierError'), { value: this })
 		this.name = 'QualifierError'
 		this.code = code
 		this.context = context
@@ -33,8 +34,24 @@ export class QualifierError extends Error {
  * Narrows a caught value to a {@link QualifierError}.
  *
  * @param value - The caught value to test
- * @returns True if `value` is a {@link QualifierError} instance; false otherwise
+ * @returns True if the error carries its own identity brand and declared members; false otherwise
  */
 export function isQualifierError(value: unknown): value is QualifierError {
-	return isInstance(value, QualifierError)
+	return holds(() => {
+		if (!(value instanceof Error) || INTRINSICS.prototype(value) === Error.prototype) return false
+		const brand = INTRINSICS.describe(value, Symbol.for('@orkestrel/qualifier.QualifierError'))
+		if (brand?.value !== value) return false
+		const code: unknown = INTRINSICS.reflect.read(value, 'code')
+		if (code !== 'DEFINITION' && code !== 'MISMATCH' && code !== 'DESTROYED' && code !== 'ENGINE')
+			return false
+		const context: unknown = INTRINSICS.reflect.read(value, 'context')
+		if (context === undefined) return true
+		if (!isObject(context)) return false
+		const pass: unknown = INTRINSICS.reflect.read(context, 'pass')
+		const definition: unknown = INTRINSICS.reflect.read(context, 'definition')
+		return (
+			(pass === undefined || typeof pass === 'string') &&
+			(definition === undefined || typeof definition === 'string')
+		)
+	})
 }
