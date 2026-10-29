@@ -1,5 +1,5 @@
 import type { QualifierErrorCode, QualifierErrorContext } from './types.js'
-import { holds, INTRINSICS, isObject } from '@orkestrel/contract'
+import { holds, INTRINSICS, isFunction, isObject } from '@orkestrel/contract'
 
 /**
  * Represents a coded programmer error thrown by the qualifier layer, carrying a
@@ -46,7 +46,7 @@ export function isQualifierError(value: unknown): value is QualifierError {
 			return false
 		const context: unknown = INTRINSICS.reflect.read(value, 'context')
 		if (context === undefined) return true
-		if (!isObject(context)) return false
+		if (!isObject(context) && !isFunction(context)) return false
 		const pass: unknown = INTRINSICS.reflect.read(context, 'pass')
 		const definition: unknown = INTRINSICS.reflect.read(context, 'definition')
 		return (

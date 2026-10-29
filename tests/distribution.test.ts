@@ -799,6 +799,7 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 const require = createRequire(import.meta.url)
 const copies = [await import('@orkestrel/qualifier'), require('@orkestrel/qualifier'), await import(pathToFileURL(process.argv[2]).href)]
+assert.equal(new Set(copies.map((entry) => entry.QualifierError)).size, copies.length)
 for (const producer of copies) {
 	const error = new producer.QualifierError('ENGINE', 'failure', { pass: 'gate' })
 	class Derived extends producer.QualifierError {
