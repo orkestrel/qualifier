@@ -64,26 +64,26 @@ per subject.
 
 A `Shape` cell holds an interface's data members as bare names in braces, `?` marking an optional member and `plus` introducing its call-signature members, and a type alias's own type literal with a union's arms escaped as `\|`.
 
-| Name                      | Kind      | Shape                                                                              | Summary                                                                                              |
-| ------------------------- | --------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `Eligibility`             | type      | `'eligible' \| 'ineligible' \| 'referral'`                                         | Represents the eligibility outcome axis.                                                             |
-| `QualificationEffect`     | type      | `'restriction' \| 'referral' \| 'condition'`                                       | Represents an authored ruling's eligibility impact.                                                  |
-| `QualificationPass`       | type      | `QuantitativeDefinition \| LogicalDefinition`                                      | Represents one ordered derivation or rule pass.                                                      |
-| `QualificationProjection` | type      | `number \| boolean \| Readonly<Record<string, unknown>>`                           | Represents one pass's internal working projection.                                                   |
-| `QualificationContext`    | type      | `Readonly<Record<string, QualificationProjection>>`                                | Represents the internal projection record stored under `QUALIFICATION_KEY`.                          |
-| `RulingInput`             | interface | `{ scope?, message? }`                                                             | Carries the optional fields `createRuling` accepts.                                                  |
-| `QualificationInput`      | interface | `{ description?, rulings?, metadata? }`                                            | Carries the optional fields `createQualificationDefinition` accepts.                                 |
-| `Ruling`                  | interface | `{ id, pass, rule, effect, scope?, message? }`                                     | Represents an authored consequence for one rule in one logical pass.                                 |
-| `Premise`                 | interface | `{ field?, label?, description?, comparison?, expected?, actual?, met? }`          | Represents display-neutral evidence for one condition, authored as a checked or a described premise. |
-| `Finding`                 | interface | `{ id, pass, rule, effect, scope?, applied, message?, premises }`                  | Represents one resolved ruling.                                                                      |
-| `Derivation`              | interface | `{ id, value, success, trace, errors }`                                            | Represents one quantitative pass's audit result.                                                     |
-| `QualificationDefinition` | interface | `{ id, name, description?, passes, rulings?, metadata? }`                          | Represents a pure authored qualification definition.                                                 |
-| `QualificationResult`     | interface | `{ id, name, eligibility, scopes, findings, derivations, success, trace, errors }` | Represents one subject's complete qualification outcome.                                             |
-| `QualifierErrorCode`      | type      | `'DEFINITION' \| 'MISMATCH' \| 'DESTROYED' \| 'ENGINE'`                            | Represents a coded `QualifierError` programmer-error code.                                           |
-| `QualifierErrorContext`   | interface | `{ pass?, definition?, cause? }`                                                   | Represents the structured payload a `QualifierError` carries.                                        |
-| `QualifierEventMap`       | type      | `{ derive, finding, qualify, destroy }`                                            | Represents the push observation surface of a `QualifierInterface`.                                   |
-| `QualifierOptions`        | interface | `{ engine?, validate?, labels?, on?, error? }`                                     | Carries the options for `createQualifier` and the `Qualifier` constructor.                           |
-| `QualifierInterface`      | interface | `{ emitter } plus qualify, validate, destroy`                                      | Owns or borrows one reason engine and returns eligibility.                                           |
+| Name                      | Kind      | Signature                                                                                                                                                                                         | Summary                                                                                              |
+| ------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `Eligibility`             | type      | `'eligible' \| 'ineligible' \| 'referral'`                                                                                                                                                        | Represents the eligibility outcome axis.                                                             |
+| `QualificationEffect`     | type      | `'restriction' \| 'referral' \| 'condition'`                                                                                                                                                      | Represents an authored ruling's eligibility impact.                                                  |
+| `QualificationPass`       | type      | `QuantitativeDefinition \| LogicalDefinition`                                                                                                                                                     | Represents one ordered derivation or rule pass.                                                      |
+| `QualificationProjection` | type      | `number \| boolean \| Readonly<Record<string, unknown>>`                                                                                                                                          | Represents one pass's internal working projection.                                                   |
+| `QualificationContext`    | type      | `Readonly<Record<string, QualificationProjection>>`                                                                                                                                               | Represents the internal projection record stored under `QUALIFICATION_KEY`.                          |
+| `RulingInput`             | interface | `{ scope?, message? }`                                                                                                                                                                            | Carries the optional fields `createRuling` accepts.                                                  |
+| `QualificationInput`      | interface | `{ description?, rulings?, metadata? }`                                                                                                                                                           | Carries the optional fields `createQualificationDefinition` accepts.                                 |
+| `Ruling`                  | interface | `{ id, pass, rule, effect, scope?, message? }`                                                                                                                                                    | Represents an authored consequence for one rule in one logical pass.                                 |
+| `Premise`                 | interface | `{ field?, label?, description?, comparison?, expected?, actual?, met? }`                                                                                                                         | Represents display-neutral evidence for one condition, authored as a checked or a described premise. |
+| `Finding`                 | interface | `{ id, pass, rule, effect, scope?, applied, message?, premises }`                                                                                                                                 | Represents one resolved ruling.                                                                      |
+| `Derivation`              | interface | `{ id, value, success, trace, errors }`                                                                                                                                                           | Represents one quantitative pass's audit result.                                                     |
+| `QualificationDefinition` | interface | `{ id, name, description?, passes, rulings?, metadata? }`                                                                                                                                         | Represents a pure authored qualification definition.                                                 |
+| `QualificationResult`     | interface | `{ id, name, eligibility, scopes, findings, derivations, success, trace, errors }`                                                                                                                | Represents one subject's complete qualification outcome.                                             |
+| `QualifierErrorCode`      | type      | `'DEFINITION' \| 'MISMATCH' \| 'DESTROYED' \| 'ENGINE'`                                                                                                                                           | Represents a coded `QualifierError` programmer-error code.                                           |
+| `QualifierErrorContext`   | interface | `{ pass?, definition?, cause? }`                                                                                                                                                                  | Represents the structured payload a `QualifierError` carries.                                        |
+| `QualifierEventMap`       | type      | `{ readonly derive: readonly [derivation: Derivation]; readonly finding: readonly [finding: Finding]; readonly qualify: readonly [result: QualificationResult]; readonly destroy: readonly []; }` | Represents the push observation surface of a `QualifierInterface`.                                   |
+| `QualifierOptions`        | interface | `{ engine?, validate?, labels?, on?, error? }`                                                                                                                                                    | Carries the options for `createQualifier` and the `Qualifier` constructor.                           |
+| `QualifierInterface`      | interface | `{ emitter, qualify(), validate(), destroy() }`                                                                                                                                                   | Owns or borrows one reason engine and returns eligibility.                                           |
 
 Every public data member is `readonly`, every optional key is omitted rather than
 `undefined`, and each name is single-word within its entity. Reason
@@ -96,10 +96,10 @@ types.
 
 A `Shape` cell holds the constant's declared type.
 
-| Name                         | Kind  | Shape                                                | Summary                                                                                                                                             |
+| Name                         | Kind  | Signature                                            | Summary                                                                                                                                             |
 | ---------------------------- | ----- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DEFAULT_QUALIFIER_VALIDATE` | const | `boolean`                                            | Holds the default definition validation policy for `createQualifier` and `Qualifier.qualify`, `true`.                                               |
-| `QUALIFICATION_KEY`          | const | `string`                                             | Names `'qualification'`, the reserved internal projection namespace a pass's working projection is written under.                                   |
+| `DEFAULT_QUALIFIER_VALIDATE` | const | `true`                                               | Holds the default definition validation policy for `createQualifier` and `Qualifier.qualify`, `true`.                                               |
+| `QUALIFICATION_KEY`          | const | `"qualification"`                                    | Names `'qualification'`, the reserved internal projection namespace a pass's working projection is written under.                                   |
 | `ELIGIBILITY_PRECEDENCE`     | const | `readonly Eligibility[]`                             | Lists the eligibility severities most to least severe: `ineligible`, `referral`, `eligible`.                                                        |
 | `EFFECT_ELIGIBILITIES`       | const | `Readonly<Record<QualificationEffect, Eligibility>>` | Maps each `QualificationEffect` to its eligibility impact — `restriction` to `ineligible`, `referral` to `referral`, and `condition` to `eligible`. |
 
@@ -108,10 +108,10 @@ its subject, so a conditional ruling contributes evidence without changing eligi
 
 ### Errors
 
-| Name               | Kind     | Summary                                                                                                                            |
-| ------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `QualifierError`   | class    | Represents a coded programmer error thrown by the qualifier layer, carrying a `QualifierErrorCode` and an optional context record. |
-| `isQualifierError` | function | Narrows a caught value to a `QualifierError`.                                                                                      |
+| Name               | Kind     | Signature                                                                                            | Summary                                                                                                                            |
+| ------------------ | -------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `QualifierError`   | class    | `new (code: QualifierErrorCode, message: string, context?: QualifierErrorContext) => QualifierError` | Represents a coded programmer error thrown by the qualifier layer, carrying a `QualifierErrorCode` and an optional context record. |
+| `isQualifierError` | function | `(value: unknown) => value is QualifierError`                                                        | Narrows a caught value to a `QualifierError`.                                                                                      |
 
 `context` is a `QualifierErrorContext` or `undefined`, so a caught error's payload
 needs no narrowing of its own. `ENGINE` marks an underlying reason engine throw that
@@ -153,18 +153,18 @@ that package.
 
 In a guard table a `Shape` cell holds the type the guard narrows to.
 
-| Name                        | Kind     | Shape                                   | Summary                                                                                     |
-| --------------------------- | -------- | --------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `isEligibility`             | const    | `Eligibility`                           | Determines whether a value is an `Eligibility` literal.                                     |
-| `isQualificationEffect`     | const    | `QualificationEffect`                   | Determines whether a value is a `QualificationEffect` literal.                              |
-| `isEligibilityRecord`       | function | `Readonly<Record<string, Eligibility>>` | Determines whether a value is an open string-keyed record of `Eligibility` values.          |
-| `isPremise`                 | function | `Premise`                               | Determines whether a value is an open result-side `Premise`.                                |
-| `isFinding`                 | function | `Finding`                               | Determines whether a value is an open result-side `Finding`.                                |
-| `isDerivation`              | function | `Derivation`                            | Determines whether a value is an open result-side `Derivation`.                             |
-| `isQualificationResult`     | function | `QualificationResult`                   | Determines whether a value is an open `QualificationResult` returned by a qualifier.        |
-| `isRuling`                  | function | `Ruling`                                | Determines whether a value is an exact `Ruling` record.                                     |
-| `isQualificationPass`       | function | `QualificationPass`                     | Determines whether a value is a `QualificationPass` (a quantitative or logical definition). |
-| `isQualificationDefinition` | function | `QualificationDefinition`               | Determines whether a value is an exact `QualificationDefinition` record.                    |
+| Name                        | Kind     | Signature                                                                         | Summary                                                                                     |
+| --------------------------- | -------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `isEligibility`             | const    | `import("@orkestrel/contract").Guard<"eligible" \| "ineligible" \| "referral">`   | Determines whether a value is an `Eligibility` literal.                                     |
+| `isQualificationEffect`     | const    | `import("@orkestrel/contract").Guard<"condition" \| "referral" \| "restriction">` | Determines whether a value is a `QualificationEffect` literal.                              |
+| `isEligibilityRecord`       | function | `(value: unknown) => value is Readonly<Record<string, Eligibility>>`              | Determines whether a value is an open string-keyed record of `Eligibility` values.          |
+| `isPremise`                 | function | `(value: unknown) => value is Premise`                                            | Determines whether a value is an open result-side `Premise`.                                |
+| `isFinding`                 | function | `(value: unknown) => value is Finding`                                            | Determines whether a value is an open result-side `Finding`.                                |
+| `isDerivation`              | function | `(value: unknown) => value is Derivation`                                         | Determines whether a value is an open result-side `Derivation`.                             |
+| `isQualificationResult`     | function | `(value: unknown) => value is QualificationResult`                                | Determines whether a value is an open `QualificationResult` returned by a qualifier.        |
+| `isRuling`                  | function | `(value: unknown) => value is Ruling`                                             | Determines whether a value is an exact `Ruling` record.                                     |
+| `isQualificationPass`       | function | `(value: unknown) => value is QualificationPass`                                  | Determines whether a value is a `QualificationPass` (a quantitative or logical definition). |
+| `isQualificationDefinition` | function | `(value: unknown) => value is QualificationDefinition`                            | Determines whether a value is an exact `QualificationDefinition` record.                    |
 
 ```ts
 import {
@@ -215,29 +215,29 @@ isQualificationDefinition({ id: 'd', name: 'D', passes: [] }) // true
 Pure exported helpers form the functional core. `Qualifier` retains only the ordered
 orchestration and ownership lifecycle.
 
-| Name                             | Kind     | Summary                                                                                                                                            |
-| -------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `interpolateMessage`             | function | Interpolates `{{dotted.path}}` tokens in a message template against a subject.                                                                     |
-| `renderComparison`               | function | Renders a `Premise` comparison as a display-neutral verb phrase.                                                                                   |
-| `renderValue`                    | function | Renders a structured or scalar expected value display-neutrally.                                                                                   |
-| `renderPremise`                  | function | Renders one `Premise` into a display-neutral sentence.                                                                                             |
-| `checkToPremise`                 | function | Builds a `Premise` from an authored `Check` and its evaluated `CheckResult`.                                                                       |
-| `ruleToPremises`                 | function | Builds rich premises for one fired `Rule` by walking its premise atoms and re-evaluating each against the working subject.                         |
-| `findRule`                       | function | Locates an authored `Rule` by id.                                                                                                                  |
-| `reasonResultToProjection`       | function | Projects one reason result into the internal qualification namespace.                                                                              |
-| `quantitativeResultToDerivation` | function | Projects a quantitative result into a `Derivation` audit record.                                                                                   |
-| `qualificationToRecord`          | function | Wraps a `QualificationContext` under `QUALIFICATION_KEY`.                                                                                          |
-| `mergeQualificationContext`      | function | Merges one pass projection into the context, copy-on-write.                                                                                        |
-| `rulingToFinding`                | function | Joins a ruling, its logical rule result, the pass, the pre-projection subject, and an evaluator into a `Finding`.                                  |
-| `deriveFindingEligibility`       | function | Derives global eligibility from applied, unscoped findings.                                                                                        |
-| `combineEligibilities`           | function | Returns the most severe `Eligibility` in a list.                                                                                                   |
-| `deriveScopeEligibilities`       | function | Derives one eligibility per finding scope.                                                                                                         |
-| `describeMissingReferences`      | function | Describes each ruling whose pass or rule does not exist or whose pass is not logical, and each pass id shadowing the reserved `QUALIFICATION_KEY`. |
-| `hasReservedKey`                 | function | Determines whether a subject already owns the reserved `QUALIFICATION_KEY`.                                                                        |
-| `assertSubject`                  | function | Asserts a value is a valid qualification `Subject`, narrowing it in place.                                                                         |
-| `mapEngineError`                 | function | Maps an engine throw caught while running one pass to a typed `QualifierError`.                                                                    |
-| `describeEmptyLogicalPasses`     | function | Describes each logical pass carrying no rulings.                                                                                                   |
-| `describeUnreadDerivations`      | function | Describes each quantitative pass never read by a later pass.                                                                                       |
+| Name                             | Kind     | Signature                                                                                                                                                                 | Summary                                                                                                                                            |
+| -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `interpolateMessage`             | function | `(template: string, subject: Readonly<Record<string, unknown>>) => string`                                                                                                | Interpolates `{{dotted.path}}` tokens in a message template against a subject.                                                                     |
+| `renderComparison`               | function | `(comparison: NonNullable<Premise['comparison']>) => string`                                                                                                              | Renders a `Premise` comparison as a display-neutral verb phrase.                                                                                   |
+| `renderValue`                    | function | `(value: unknown) => string`                                                                                                                                              | Renders a structured or scalar expected value display-neutrally.                                                                                   |
+| `renderPremise`                  | function | `(entry: Premise, labels?: Readonly<Record<string, string>>) => string`                                                                                                   | Renders one `Premise` into a display-neutral sentence.                                                                                             |
+| `checkToPremise`                 | function | `(check: Check, result: CheckResult, labels?: Readonly<Record<string, string>>) => Premise`                                                                               | Builds a `Premise` from an authored `Check` and its evaluated `CheckResult`.                                                                       |
+| `ruleToPremises`                 | function | `(rule: Rule, working: Subject, evaluator: EvaluatorInterface, labels?: Readonly<Record<string, string>>) => readonly Premise[]`                                          | Builds rich premises for one fired `Rule` by walking its premise atoms and re-evaluating each against the working subject.                         |
+| `findRule`                       | function | `(definition: LogicalDefinition, id: string) => Rule \| undefined`                                                                                                        | Locates an authored `Rule` by id.                                                                                                                  |
+| `reasonResultToProjection`       | function | `(definition: QualificationPass, result: ReasonResult) => QualificationProjection`                                                                                        | Projects one reason result into the internal qualification namespace.                                                                              |
+| `quantitativeResultToDerivation` | function | `(id: string, result: QuantitativeResult) => Derivation`                                                                                                                  | Projects a quantitative result into a `Derivation` audit record.                                                                                   |
+| `qualificationToRecord`          | function | `(context: QualificationContext) => Readonly<Record<string, QualificationContext>>`                                                                                       | Wraps a `QualificationContext` under `QUALIFICATION_KEY`.                                                                                          |
+| `mergeQualificationContext`      | function | `(context: QualificationContext, id: string, projection: QualificationProjection) => QualificationContext`                                                                | Merges one pass projection into the context, copy-on-write.                                                                                        |
+| `rulingToFinding`                | function | `(ruling: Ruling, pass: QualificationPass, result: LogicalResult, subject: Subject, evaluator: EvaluatorInterface, labels?: Readonly<Record<string, string>>) => Finding` | Joins a ruling, its logical rule result, the pass, the pre-projection subject, and an evaluator into a `Finding`.                                  |
+| `deriveFindingEligibility`       | function | `(findings: readonly Finding[], failed?: boolean) => Eligibility`                                                                                                         | Derives global eligibility from applied, unscoped findings.                                                                                        |
+| `combineEligibilities`           | function | `(eligibilities: readonly Eligibility[]) => Eligibility`                                                                                                                  | Returns the most severe `Eligibility` in a list.                                                                                                   |
+| `deriveScopeEligibilities`       | function | `(findings: readonly Finding[]) => Readonly<Record<string, Eligibility>>`                                                                                                 | Derives one eligibility per finding scope.                                                                                                         |
+| `describeMissingReferences`      | function | `(definition: QualificationDefinition) => readonly string[]`                                                                                                              | Describes each ruling whose pass or rule does not exist or whose pass is not logical, and each pass id shadowing the reserved `QUALIFICATION_KEY`. |
+| `hasReservedKey`                 | function | `(subject: Subject) => boolean`                                                                                                                                           | Determines whether a subject already owns the reserved `QUALIFICATION_KEY`.                                                                        |
+| `assertSubject`                  | function | `(value: unknown) => asserts value is Subject`                                                                                                                            | Asserts a value is a valid qualification `Subject`, narrowing it in place.                                                                         |
+| `mapEngineError`                 | function | `(error: unknown, pass: string) => QualifierError`                                                                                                                        | Maps an engine throw caught while running one pass to a typed `QualifierError`.                                                                    |
+| `describeEmptyLogicalPasses`     | function | `(definition: QualificationDefinition) => readonly string[]`                                                                                                              | Describes each logical pass carrying no rulings.                                                                                                   |
+| `describeUnreadDerivations`      | function | `(definition: QualificationDefinition) => readonly string[]`                                                                                                              | Describes each quantitative pass never read by a later pass.                                                                                       |
 
 Every helper carries a worked `@example` in source and is composed by `Qualifier`
 rather than reimplemented by it.
@@ -339,11 +339,11 @@ assertSubject({ id: 's1' }) // narrows to Subject; throws QualifierError('MISMAT
 
 ### Factories
 
-| Name                            | Kind     | Summary                                                                        |
-| ------------------------------- | -------- | ------------------------------------------------------------------------------ |
-| `createQualifier`               | function | Creates one `QualifierInterface` over a reason engine.                         |
-| `createQualificationDefinition` | function | Creates a fresh `QualificationDefinition`, omitting every absent optional key. |
-| `createRuling`                  | function | Creates a fresh `Ruling` from the rule it reacts to and the effect it applies. |
+| Name                            | Kind     | Signature                                                                                                                 | Summary                                                                        |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `createQualifier`               | function | `(options?: QualifierOptions) => QualifierInterface`                                                                      | Creates one `QualifierInterface` over a reason engine.                         |
+| `createQualificationDefinition` | function | `(id: string, name: string, passes: readonly QualificationPass[], input?: QualificationInput) => QualificationDefinition` | Creates a fresh `QualificationDefinition`, omitting every absent optional key. |
+| `createRuling`                  | function | `(id: string, pass: string, rule: string, effect: QualificationEffect, input?: RulingInput) => Ruling`                    | Creates a fresh `Ruling` from the rule it reacts to and the effect it applies. |
 
 #### Create a qualifier
 
@@ -388,9 +388,9 @@ Every factory returns a fresh value and omits absent optional keys.
 
 ### Classes
 
-| Name        | Kind  | Summary                                                             |
-| ----------- | ----- | ------------------------------------------------------------------- |
-| `Qualifier` | class | Runs ordered passes over one reason engine and returns eligibility. |
+| Name        | Kind  | Signature                                                | Summary                                                             |
+| ----------- | ----- | -------------------------------------------------------- | ------------------------------------------------------------------- |
+| `Qualifier` | class | `new (options?: QualifierOptions) => QualifierInterface` | Runs ordered passes over one reason engine and returns eligibility. |
 
 ## Methods
 
