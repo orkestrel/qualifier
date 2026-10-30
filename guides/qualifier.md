@@ -64,7 +64,7 @@ per subject.
 
 A `Shape` cell holds an interface's data members as bare names in braces, `?` marking an optional member and `plus` introducing its call-signature members, and a type alias's own type literal with a union's arms escaped as `\|`.
 
-| Type                      | Kind      | Shape                                                                              | Summary                                                                                              |
+| Name                      | Kind      | Shape                                                                              | Summary                                                                                              |
 | ------------------------- | --------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `Eligibility`             | type      | `'eligible' \| 'ineligible' \| 'referral'`                                         | Represents the eligibility outcome axis.                                                             |
 | `QualificationEffect`     | type      | `'restriction' \| 'referral' \| 'condition'`                                       | Represents an authored ruling's eligibility impact.                                                  |
@@ -96,7 +96,7 @@ types.
 
 A `Shape` cell holds the constant's declared type.
 
-| API                          | Kind  | Shape                                                | Summary                                                                                                                                             |
+| Name                         | Kind  | Shape                                                | Summary                                                                                                                                             |
 | ---------------------------- | ----- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DEFAULT_QUALIFIER_VALIDATE` | const | `boolean`                                            | Holds the default definition validation policy for `createQualifier` and `Qualifier.qualify`, `true`.                                               |
 | `QUALIFICATION_KEY`          | const | `string`                                             | Names `'qualification'`, the reserved internal projection namespace a pass's working projection is written under.                                   |
@@ -108,7 +108,7 @@ its subject, so a conditional ruling contributes evidence without changing eligi
 
 ### Errors
 
-| API                | Kind     | Summary                                                                                                                            |
+| Name               | Kind     | Summary                                                                                                                            |
 | ------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `QualifierError`   | class    | Represents a coded programmer error thrown by the qualifier layer, carrying a `QualifierErrorCode` and an optional context record. |
 | `isQualifierError` | function | Narrows a caught value to a `QualifierError`.                                                                                      |
@@ -153,7 +153,7 @@ that package.
 
 In a guard table a `Shape` cell holds the type the guard narrows to.
 
-| API                         | Kind     | Shape                                   | Summary                                                                                     |
+| Name                        | Kind     | Shape                                   | Summary                                                                                     |
 | --------------------------- | -------- | --------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `isEligibility`             | const    | `Eligibility`                           | Determines whether a value is an `Eligibility` literal.                                     |
 | `isQualificationEffect`     | const    | `QualificationEffect`                   | Determines whether a value is a `QualificationEffect` literal.                              |
@@ -215,7 +215,7 @@ isQualificationDefinition({ id: 'd', name: 'D', passes: [] }) // true
 Pure exported helpers form the functional core. `Qualifier` retains only the ordered
 orchestration and ownership lifecycle.
 
-| API                              | Kind     | Summary                                                                                                                                            |
+| Name                             | Kind     | Summary                                                                                                                                            |
 | -------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `interpolateMessage`             | function | Interpolates `{{dotted.path}}` tokens in a message template against a subject.                                                                     |
 | `renderComparison`               | function | Renders a `Premise` comparison as a display-neutral verb phrase.                                                                                   |
@@ -339,7 +339,7 @@ assertSubject({ id: 's1' }) // narrows to Subject; throws QualifierError('MISMAT
 
 ### Factories
 
-| API                             | Kind     | Summary                                                                        |
+| Name                            | Kind     | Summary                                                                        |
 | ------------------------------- | -------- | ------------------------------------------------------------------------------ |
 | `createQualifier`               | function | Creates one `QualifierInterface` over a reason engine.                         |
 | `createQualificationDefinition` | function | Creates a fresh `QualificationDefinition`, omitting every absent optional key. |
@@ -388,7 +388,7 @@ Every factory returns a fresh value and omits absent optional keys.
 
 ### Classes
 
-| API         | Kind  | Summary                                                             |
+| Name        | Kind  | Summary                                                             |
 | ----------- | ----- | ------------------------------------------------------------------- |
 | `Qualifier` | class | Runs ordered passes over one reason engine and returns eligibility. |
 
