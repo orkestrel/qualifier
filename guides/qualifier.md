@@ -62,8 +62,6 @@ per subject.
 
 ### Types
 
-A `Shape` cell holds an interface's data members as bare names in braces, `?` marking an optional member and `plus` introducing its call-signature members, and a type alias's own type literal with a union's arms escaped as `\|`.
-
 | Name                      | Kind      | Signature                                                                                                                                                                                         | Summary                                                                                              |
 | ------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `Eligibility`             | type      | `'eligible' \| 'ineligible' \| 'referral'`                                                                                                                                                        | Represents the eligibility outcome axis.                                                             |
@@ -93,8 +91,6 @@ contract supplies `FieldPath` and `JSONValue`; the emitter supplies the observat
 types.
 
 ### Constants
-
-A `Shape` cell holds the constant's declared type.
 
 | Name                         | Kind  | Signature                                            | Summary                                                                                                                                             |
 | ---------------------------- | ----- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -150,8 +146,6 @@ produces `qualify` results may live outside this package. Every validator remain
 arrays where a record is required, returns `false` for hostile reads, and never throws. A `validate`
 result belongs to `@orkestrel/reason`, so narrow one with the `isReasonValidationResult` guard from
 that package.
-
-In a guard table a `Shape` cell holds the type the guard narrows to.
 
 | Name                        | Kind     | Signature                                                                         | Summary                                                                                     |
 | --------------------------- | -------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
