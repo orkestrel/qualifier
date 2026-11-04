@@ -52,6 +52,54 @@ import {
 } from '../../setup.js'
 
 describe('Qualifier', () => {
+	it.each<[string, unknown]>([
+		['null', null],
+		['undefined', undefined],
+		['a symbol', Symbol('definition')],
+		['a string', 'definition'],
+		['an array', []],
+		['an empty record', {}],
+		['a numeric id', { id: 1, name: 'Definition', passes: [] }],
+		['a numeric name', { id: 'd', name: 1, passes: [] }],
+		['null passes', { id: 'd', name: 'Definition', passes: null }],
+		['record passes', { id: 'd', name: 'Definition', passes: {} }],
+		['a null pass', { id: 'd', name: 'Definition', passes: [null] }],
+		[
+			'a malformed logical pass',
+			{
+				id: 'd',
+				name: 'Definition',
+				passes: [{ id: 'p', name: 'Pass', reasoning: 'logical', rules: null }],
+			},
+		],
+		[
+			'a malformed quantitative pass',
+			{
+				id: 'd',
+				name: 'Definition',
+				passes: [{ id: 'p', name: 'Pass', reasoning: 'quantitative', groups: null }],
+			},
+		],
+		['null rulings', { id: 'd', name: 'Definition', passes: [], rulings: null }],
+		['a null ruling', { id: 'd', name: 'Definition', passes: [], rulings: [null] }],
+		['a null shape', { id: 'd', name: 'Definition', passes: [], shape: null }],
+		[
+			'non-JSON metadata',
+			{ id: 'd', name: 'Definition', passes: [], metadata: { value: Number.NaN } },
+		],
+	])(
+		'with validation off, refuses %s as DEFINITION rather than TypeError',
+		(_label, definition) => {
+			const qualifier = createQualifier({ validate: false })
+			const error = captureError(() =>
+				invokeUnchecked<unknown>(qualifier, qualifier.qualify, [{ x: 1 }, definition]),
+			)
+			expect(isQualifierError(error)).toBe(true)
+			expect(error).toMatchObject({ code: 'DEFINITION' })
+			qualifier.destroy()
+		},
+	)
+
 	describe('referral finding and message interpolation', () => {
 		it('produces an applied referral finding with interpolated premises', () => {
 			const qualifier = createQualifier()
