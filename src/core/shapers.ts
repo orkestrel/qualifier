@@ -1,6 +1,8 @@
 import type { ContractShape } from '@orkestrel/contract'
 import {
 	arrayShape,
+	auditFaultShape,
+	shapeShape,
 	jsonShape,
 	literalShape,
 	nullableShape,
@@ -16,7 +18,6 @@ import {
 	CHECK_STATES,
 	COMPARISONS,
 	createLogicalDefinitionShape,
-	faultShape,
 	fieldPathShape,
 	quantitativeDefinitionShape,
 } from '@orkestrel/reason'
@@ -40,7 +41,7 @@ export const rulingShape: ContractShape = objectShape({
  * Creates the shape of a `QualificationDefinition`.
  *
  * @remarks
- * `shape` is any JSON value here. A `ContractShape` is recursive, so `validate` reads it.
+ * `shape` is checked as a recursive contract shape.
  *
  * @returns A shape holding quantitative and logical passes and rulings
  *
@@ -60,7 +61,7 @@ export function createQualificationDefinitionShape(): ContractShape {
 		passes: arrayShape(unionShape(quantitativeDefinitionShape, createLogicalDefinitionShape())),
 		rulings: optionalShape(arrayShape(rulingShape)),
 		metadata: optionalShape(recordShape(jsonShape())),
-		shape: optionalShape(jsonShape()),
+		shape: optionalShape(shapeShape()),
 	})
 }
 
@@ -107,7 +108,7 @@ export const qualificationResultShape: ContractShape = objectShape({
 	success: booleanShape(),
 	trace: arrayShape(stringShape()),
 	errors: arrayShape(stringShape()),
-	faults: arrayShape(faultShape),
-	repairs: arrayShape(faultShape),
+	faults: arrayShape(auditFaultShape()),
+	repairs: arrayShape(auditFaultShape()),
 	defaulted: arrayShape(fieldPathShape),
 })

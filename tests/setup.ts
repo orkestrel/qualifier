@@ -16,7 +16,23 @@ import {
 	isQualificationDefinition,
 	QUALIFICATION_KEY,
 } from '@src/core'
-import { isObject } from '@orkestrel/contract'
+import { createContract, isObject } from '@orkestrel/contract'
+import { projectValue } from '@orkestrel/reason'
+import {
+	createQualificationDefinitionContract,
+	createQualifier,
+	qualificationResultContract,
+	isQualificationResult,
+	projectQualificationResult,
+	rulingShape,
+	premiseShape,
+	findingShape,
+	derivationShape,
+	isRuling,
+	isPremise,
+	isFinding,
+	isDerivation,
+} from '@src/core'
 import { Emitter } from '@orkestrel/emitter'
 import { createRecorder } from '@orkestrel/test'
 import {
@@ -32,6 +48,70 @@ import {
 	isLogicalDefinition,
 	Reason,
 } from '@orkestrel/reason'
+
+/** Builds the standing guard/contract table from real qualification outcomes. */
+export function buildQualifierContractCases() {
+	const definition = createQualificationDefinition('d', 'D', [])
+	const qualifier = createQualifier()
+	const positive = qualifier.qualify({}, definition)
+	qualifier.destroy()
+	return {
+		definitions: [
+			{
+				name: 'qualification definition',
+				wire: createQualificationDefinitionContract(),
+				guard: isQualificationDefinition,
+				positive: definition,
+			},
+			{
+				name: 'ruling',
+				wire: createContract(rulingShape),
+				guard: isRuling,
+				positive: createRuling('r', 'p', 'rule', 'restriction'),
+			},
+		].map((row) => ({ ...row, direction: 'is implies guard', project: undefined, negative: {} })),
+		results: [
+			{
+				name: 'qualification result',
+				wire: qualificationResultContract,
+				guard: isQualificationResult,
+				project: projectQualificationResult,
+				positive,
+			},
+		].map((row) => ({ ...row, direction: 'producer implies wire after projection', negative: {} })),
+		members: [
+			{
+				name: 'premise',
+				wire: createContract(premiseShape),
+				guard: isPremise,
+				positive: { field: 'x', actual: NaN },
+			},
+			{
+				name: 'finding',
+				wire: createContract(findingShape),
+				guard: isFinding,
+				positive: buildFinding({
+					id: 'f',
+					pass: 'p',
+					rule: 'r',
+					effect: 'restriction',
+					state: 'met',
+				}),
+			},
+			{
+				name: 'derivation',
+				wire: createContract(derivationShape),
+				guard: isDerivation,
+				positive: { id: 'p', value: NaN, success: false, trace: [], errors: ['unread'] },
+			},
+		].map((row) => ({
+			...row,
+			direction: 'producer implies wire after projection',
+			project: projectValue,
+			negative: { id: 0, field: 0 },
+		})),
+	}
+}
 
 /** Builds every ordering of a list, so a case can drive an order-independent helper with each. */
 export function buildPermutations<T>(list: readonly T[]): readonly T[][] {

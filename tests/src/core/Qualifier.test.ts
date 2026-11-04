@@ -890,7 +890,7 @@ describe('Qualifier — refusing what it cannot read', () => {
 		const result = qualifier.qualify({}, definition)
 		expect(result.eligibility).toBe('referral')
 		expect(result.success).toBe(false)
-		expect(result.errors).toEqual(['Field "credit" is missing'])
+		expect(result.errors).toEqual(['credit: missing; expected number'])
 		expect(result.faults).toEqual([{ reason: 'missing', path: 'credit', expected: 'number' }])
 		expect(result.findings.map((finding) => finding.state)).toEqual(['unread'])
 		qualifier.destroy()
@@ -923,7 +923,7 @@ describe('Qualifier — refusing what it cannot read', () => {
 		const definition = createQualificationDefinition('d', 'd', [gates, later])
 		const result = qualifier.qualify({}, definition)
 		expect(result.faults).toEqual([{ reason: 'missing', path: 'credit', expected: 'number' }])
-		expect(result.errors).toEqual(['Field "credit" is missing'])
+		expect(result.errors).toEqual(['credit: missing; expected number'])
 		qualifier.destroy()
 	})
 
@@ -1026,7 +1026,7 @@ describe('Qualifier — the door', () => {
 		expect(result.eligibility).toBe('referral')
 		expect(result.success).toBe(false)
 		expect(result.faults).toEqual([{ reason: 'extra', path: ['agee'] }])
-		expect(result.errors).toEqual(['Field "agee" is not declared'])
+		expect(result.errors).toEqual(['agee: extra; this key is not declared, remove it'])
 		expect(result.findings).toEqual([])
 		qualifier.destroy()
 	})
@@ -1146,11 +1146,11 @@ describe('Qualifier — published contracts', () => {
 		expect(contract.is({ ...definition, extra: 1 })).toBe(false)
 	})
 
-	it('names the gap: is admits a malformed nested shape, and the guard refuses it', () => {
+	it('refuses a malformed nested shape alongside the guard', () => {
 		const contract = createQualificationDefinitionContract()
 		const definition = createQualificationDefinition('d', 'd', [])
 		for (const shape of [42, null, {}, { type: 'nonsense' }]) {
-			expect(contract.is({ ...definition, shape })).toBe(true)
+			expect(contract.is({ ...definition, shape })).toBe(false)
 			expect(isQualificationDefinition({ ...definition, shape })).toBe(false)
 		}
 	})
@@ -1264,7 +1264,7 @@ describe('Qualifier — what the review broke', () => {
 			createQualificationDefinition('d', 'd', [first, second, third]),
 		)
 		expect(result.faults).toEqual([{ reason: 'missing', path: 'age', expected: 'number' }])
-		expect(result.errors).toEqual(['Field "age" is missing'])
+		expect(result.errors).toEqual(['age: missing; expected number'])
 		qualifier.destroy()
 	})
 

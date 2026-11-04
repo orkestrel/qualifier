@@ -45,14 +45,13 @@ import {
 	isQualificationPass,
 	isRuling,
 } from './validators.js'
-import { isArray, isRecord, isString } from '@orkestrel/contract'
+import { describeFaults, isArray, isRecord, isString } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
 import {
 	createLogicalReasoner,
 	createQuantitativeReasoner,
 	createReason,
 	createSubjectDoor,
-	describeFault,
 	filterUniqueFaults,
 	isContractShape,
 	isReasonResult,
@@ -337,7 +336,7 @@ export class Qualifier implements QualifierInterface {
 			// A fault's own string is written once at the end, after a read of an unread pass has
 			// become what that pass could not read. What no fault can say stays here. `success` is
 			// the verdict, so one that says nothing, or a success beside an unread rule, is an error.
-			const said = new Set(result.faults.map((fault) => describeFault(fault)))
+			const said = new Set(result.faults.map((fault) => describeFaults([fault])))
 			const fatal = [
 				...result.errors.filter((entry) => !said.has(entry)),
 				...(!result.success && result.errors.length === 0
@@ -393,7 +392,7 @@ export class Qualifier implements QualifierInterface {
 			findings,
 			derivations,
 			trace,
-			[...errors, ...leaves.map((fault) => describeFault(fault))],
+			[...errors, ...leaves.map((fault) => describeFaults([fault]))],
 			leaves,
 			admission,
 		)
