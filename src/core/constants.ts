@@ -12,6 +12,9 @@ export const DEFAULT_QUALIFIER_VALIDATE = true
  */
 export const QUALIFICATION_KEY = 'qualification'
 
+/** Matches each `{{dotted.path}}` token of a message template, with the path as its one group. */
+export const MESSAGE_TOKEN = /\{\{\s*([^}]+?)\s*\}\}/g
+
 /** Lists the eligibility outcomes. */
 export const ELIGIBILITIES = ['eligible', 'ineligible', 'referral'] as const
 

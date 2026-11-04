@@ -1098,6 +1098,15 @@ describe('Qualifier — published contracts', () => {
 		expect(contract.is({ ...definition, extra: 1 })).toBe(false)
 	})
 
+	it('names the gap: is admits a malformed nested shape, and the guard refuses it', () => {
+		const contract = createQualificationDefinitionContract()
+		const definition = createQualificationDefinition('d', 'd', [])
+		for (const shape of [42, null, {}, { type: 'nonsense' }]) {
+			expect(contract.is({ ...definition, shape })).toBe(true)
+			expect(isQualificationDefinition({ ...definition, shape })).toBe(false)
+		}
+	})
+
 	it('a result crosses as its projection, even over a hostile actual', () => {
 		const qualifier = createQualifier()
 		const pass = createLogicalDefinition('gates', 'Gates', [

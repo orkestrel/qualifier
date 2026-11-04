@@ -23,7 +23,12 @@ import type {
 	ShapeScan,
 	Subject,
 } from '@orkestrel/reason'
-import { EFFECT_ELIGIBILITIES, ELIGIBILITY_PRECEDENCE, QUALIFICATION_KEY } from './constants.js'
+import {
+	EFFECT_ELIGIBILITIES,
+	ELIGIBILITY_PRECEDENCE,
+	MESSAGE_TOKEN,
+	QUALIFICATION_KEY,
+} from './constants.js'
 import { QualifierError } from './errors.js'
 import { isArray, isError, isFiniteNumber, isRecord, resolveField } from '@orkestrel/contract'
 import {
@@ -65,12 +70,29 @@ export function interpolateMessage(
 	template: string,
 	subject: Readonly<Record<string, unknown>>,
 ): string {
-	return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, path: string) => {
+	return template.replace(MESSAGE_TOKEN, (_match, path: string) => {
 		const value = resolveField(subject, path.split('.'))
 		if (value === undefined) return ''
 		if (isFiniteNumber(value)) return value.toLocaleString('en-US')
 		return String(value)
 	})
+}
+
+/**
+ * Finds the `{{dotted.path}}` tokens a message template reads.
+ *
+ * @param template - The message template
+ * @returns Each token's dotted path, trimmed, in order, repeats included
+ *
+ * @example
+ * ```ts
+ * import { findMessageTokens } from '@orkestrel/qualifier'
+ *
+ * findMessageTokens('Age {{ age }} in {{home.city}}') // ['age', 'home.city']
+ * ```
+ */
+export function findMessageTokens(template: string): readonly string[] {
+	return [...template.matchAll(MESSAGE_TOKEN)].map((match) => match[1] ?? '')
 }
 
 /**
@@ -388,9 +410,11 @@ export function expandPassFaults(
  *
  * @remarks
  * A read under `qualification` reads a pass's projection, and a pass's own conclusion keys are
- * its own, so neither needs a declaration. A `raw` or `json` read is a warning.
+ * its own, so neither needs a declaration. A host that projects a key of its own names it in
+ * `projections`. A `raw` or `json` read is a warning.
  *
  * @param definition - The definition
+ * @param projections - Further keys the host projects onto the subject. Default: none
  * @returns The errors and warnings, empty with no shape
  *
  * @example
@@ -406,7 +430,10 @@ export function expandPassFaults(
  * scanDefinitionShape(createQualificationDefinition('d', 'd', [pass], { shape })).errors.length // 1
  * ```
  */
-export function scanDefinitionShape(definition: QualificationDefinition): ShapeScan {
+export function scanDefinitionShape(
+	definition: QualificationDefinition,
+	projections: readonly string[] = [],
+): ShapeScan {
 	const { shape } = definition
 	if (shape === undefined) return { errors: [], warnings: [] }
 	const scans = definition.passes.map((pass) => {
@@ -415,7 +442,7 @@ export function scanDefinitionShape(definition: QualificationDefinition): ShapeS
 			const checks = enabled
 				.flatMap((rule) => rule.premises.flatMap((premise) => extractAtoms(premise)))
 				.map((atom) => atom.check)
-				.filter((check) => !readsProjection(check.field))
+				.filter((check) => !readsProjection(check.field, projections))
 			return scanShapeReads(shape, checks, [], new Set(collectConcluders(enabled).keys()))
 		}
 		const factors = pass.groups.flatMap((group) => group.factors)
@@ -423,10 +450,10 @@ export function scanDefinitionShape(definition: QualificationDefinition): ShapeS
 			shape,
 			factors
 				.flatMap((factor) => factor.checks ?? [])
-				.filter((check) => !readsProjection(check.field)),
+				.filter((check) => !readsProjection(check.field, projections)),
 			factors
 				.flatMap((factor) => (factor.source.origin === 'static' ? [] : [factor.source.field]))
-				.filter((field) => !readsProjection(field)),
+				.filter((field) => !readsProjection(field, projections)),
 			new Set(),
 		)
 	})
@@ -442,21 +469,25 @@ export function scanDefinitionShape(definition: QualificationDefinition): ShapeS
 }
 
 /**
- * Determines whether a field reads a pass's projection under `qualification`.
+ * Determines whether a field reads a pass's projection under `qualification`, or a key the host projects.
  *
  * @param field - The field
- * @returns True for an array path starting at the reserved key; false otherwise
+ * @param projections - Further keys the host projects onto the subject. Default: none
+ * @returns True for an array path starting at the reserved key or a projected key; false otherwise
  *
  * @example
  * ```ts
  * import { readsProjection } from '@orkestrel/qualifier'
  *
  * readsProjection(['qualification', 'gates', 'ok']) // true
+ * readsProjection(['aggregate', 'count'], ['aggregate']) // true
  * readsProjection('age')                            // false
  * ```
  */
-export function readsProjection(field: FieldPath): boolean {
-	return isArray(field) && field[0] === QUALIFICATION_KEY
+export function readsProjection(field: FieldPath, projections: readonly string[] = []): boolean {
+	if (!isArray(field)) return false
+	const key = field[0]
+	return key === QUALIFICATION_KEY || (key !== undefined && projections.includes(key))
 }
 
 /**
@@ -544,8 +575,7 @@ export function describeUnknownTokens(definition: QualificationDefinition): read
 	const { shape } = definition
 	if (shape === undefined) return []
 	return (definition.rulings ?? []).flatMap((ruling) =>
-		[...(ruling.message ?? '').matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)].flatMap((match) => {
-			const token = match[1] ?? ''
+		findMessageTokens(ruling.message ?? '').flatMap((token) => {
 			const path = token.split('.')
 			if (path[0] === QUALIFICATION_KEY || findFieldShape(shape, path).declared) return []
 			return [`Ruling '${ruling.id}' message reads "${token}", and the shape does not declare it`]

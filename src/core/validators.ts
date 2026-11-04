@@ -9,6 +9,7 @@ import type {
 	Ruling,
 } from './types.js'
 import {
+	isAuditFault,
 	arrayOf,
 	isBoolean,
 	isJSONValue,
@@ -22,7 +23,6 @@ import {
 } from '@orkestrel/contract'
 import { ELIGIBILITIES, QUALIFICATION_EFFECTS } from './constants.js'
 import {
-	isAuditFault,
 	isCheckState,
 	isComparison,
 	isContractShape,

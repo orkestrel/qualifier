@@ -14,6 +14,7 @@ import {
 	describeUnknownTokens,
 	describeUnreadDerivations,
 	expandPassFaults,
+	findMessageTokens,
 	findRule,
 	hasReservedKey,
 	interpolateMessage,
@@ -23,11 +24,13 @@ import {
 	qualificationToRecord,
 	quantitativeResultToDerivation,
 	reasonResultToProjection,
+	readsProjection,
 	renderComparison,
 	renderPremise,
 	renderValue,
 	ruleToPremises,
 	rulingToFinding,
+	scanDefinitionShape,
 } from '@src/core'
 import {
 	createAtom,
@@ -765,5 +768,86 @@ describe('describeUnknownTokens', () => {
 			rulings: [createRuling('c', 'p', 'r', 'referral', { message: 'Bad {{agee}}' })],
 		})
 		expect(describeUnknownTokens(definition)).toEqual([])
+	})
+})
+
+describe('findMessageTokens', () => {
+	it('finds each token trimmed and in order, repeats included', () => {
+		expect(findMessageTokens('Age {{ age }} in {{home.city}}, {{age}}')).toEqual([
+			'age',
+			'home.city',
+			'age',
+		])
+		expect(findMessageTokens('No tokens')).toEqual([])
+		expect(findMessageTokens('{{open')).toEqual([])
+	})
+
+	it('reads the same after the shared pattern has already run', () => {
+		expect(interpolateMessage('{{a}} {{b}}', { a: 1, b: 2 })).toBe('1 2')
+		expect(findMessageTokens('{{a}}')).toEqual(['a'])
+		expect(findMessageTokens('{{a}}')).toEqual(['a'])
+		expect(interpolateMessage('{{a}}', { a: 1 })).toBe('1')
+	})
+})
+
+describe('readsProjection', () => {
+	it('reads an array path at the reserved key, or at a key the host names', () => {
+		expect(readsProjection(['qualification', 'gates', 'ok'])).toBe(true)
+		expect(readsProjection(['aggregate', 'count'])).toBe(false)
+		expect(readsProjection(['aggregate', 'count'], ['aggregate'])).toBe(true)
+		expect(readsProjection(['age'], ['aggregate'])).toBe(false)
+	})
+
+	it('reads a plain string as one key, which names no projection', () => {
+		expect(readsProjection('qualification')).toBe(false)
+		expect(readsProjection('aggregate.count', ['aggregate'])).toBe(false)
+		expect(readsProjection([], ['aggregate'])).toBe(false)
+	})
+})
+
+describe('scanDefinitionShape', () => {
+	const shape = objectShape({ age: numberShape() })
+	const read = ['aggregate', 'count']
+	const refusal = 'Field "aggregate.count" is read, and the shape does not declare it'
+
+	it('refuses a rule reading a projection until the host names it', () => {
+		const pass = createLogicalDefinition('gates', 'Gates', [
+			createRule('r', [createAtom(read, 'above', 0)], createAtom('ok', 'equals', true)),
+		])
+		const definition = createQualificationDefinition('d', 'd', [pass], { shape })
+		expect(scanDefinitionShape(definition).errors).toEqual([refusal])
+		expect(scanDefinitionShape(definition, ['aggregate']).errors).toEqual([])
+	})
+
+	it('refuses a factor reading a projection until the host names it', () => {
+		const pass = createQuantitativeDefinition('rate', 'Rate', [
+			createFactorGroup('g', 'sum', [createFieldFactor('f', read)]),
+		])
+		const definition = createQualificationDefinition('d', 'd', [pass], { shape })
+		expect(scanDefinitionShape(definition).errors).toEqual([refusal])
+		expect(scanDefinitionShape(definition, ['aggregate']).errors).toEqual([])
+	})
+
+	it('still refuses a plain string that only looks like a projection', () => {
+		const pass = createLogicalDefinition('gates', 'Gates', [
+			createRule(
+				'r',
+				[createAtom('aggregate.count', 'above', 0)],
+				createAtom('ok', 'equals', true),
+			),
+		])
+		const definition = createQualificationDefinition('d', 'd', [pass], { shape })
+		expect(scanDefinitionShape(definition, ['aggregate']).errors).toEqual([refusal])
+	})
+
+	it('says nothing with no shape, and refuses a shape holding the reserved key', () => {
+		expect(scanDefinitionShape(createQualificationDefinition('d', 'd', []))).toEqual({
+			errors: [],
+			warnings: [],
+		})
+		const reserved = objectShape({ qualification: numberShape() })
+		expect(
+			scanDefinitionShape(createQualificationDefinition('d', 'd', [], { shape: reserved })).errors,
+		).toEqual(["Shape declares the reserved key 'qualification'"])
 	})
 })

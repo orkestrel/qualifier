@@ -18,7 +18,9 @@ import { createQualificationDefinitionShape } from './shapers.js'
  *
  * @remarks
  * Cross a definition on `is`, never `parse`, and hold the result, because building it walks the
- * recursive expressions of its logical passes.
+ * recursive expressions of its logical passes. `is` reads a nested `shape` as any JSON value and
+ * the guard reads it as a shape, so a definition crossing a boundary goes through
+ * `isQualificationDefinition` as well.
  *
  * @returns A contract over a qualification definition
  *
