@@ -221,6 +221,24 @@ export function isRuling(value: unknown): value is Ruling {
 }
 
 /**
+ * Determines whether a value is a definition's `metadata`: a record of JSON values.
+ *
+ * @param value - The value to test
+ * @returns True for a record whose every value is JSON; false otherwise
+ *
+ * @example
+ * ```ts
+ * import { isDefinitionMetadata } from '@orkestrel/qualifier'
+ *
+ * isDefinitionMetadata({ a: 1 })          // true
+ * isDefinitionMetadata({ a: Number.NaN }) // false
+ * ```
+ */
+export const isDefinitionMetadata = whereOf(isRecord, (record) =>
+	Object.values(record).every(isJSONValue),
+)
+
+/**
  * Determines whether a value is an exact {@link QualificationDefinition} record.
  *
  * @remarks
@@ -239,7 +257,7 @@ export function isQualificationDefinition(value: unknown): value is Qualificatio
 			description: isString,
 			passes: arrayOf(isQualificationPass),
 			rulings: arrayOf(isRuling),
-			metadata: whereOf(isRecord, (record) => Object.values(record).every(isJSONValue)),
+			metadata: isDefinitionMetadata,
 			shape: isContractShape,
 		},
 		['description', 'rulings', 'metadata', 'shape'],

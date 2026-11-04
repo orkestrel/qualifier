@@ -1,4 +1,4 @@
-import type { AuditFault, JSONValue } from '@orkestrel/contract'
+import type { AuditFault, FieldPath, JSONValue } from '@orkestrel/contract'
 import type {
 	Derivation,
 	Eligibility,
@@ -20,6 +20,7 @@ import type {
 	ReasonResult,
 	Rule,
 	RuleResult,
+	ShapeScan,
 	Subject,
 } from '@orkestrel/reason'
 import { EFFECT_ELIGIBILITIES, ELIGIBILITY_PRECEDENCE, QUALIFICATION_KEY } from './constants.js'
@@ -29,11 +30,13 @@ import {
 	extractAtoms,
 	extractConclusions,
 	filterUniqueFaults,
+	collectConcluders,
 	findFieldShape,
 	formatField,
 	isBounds,
 	isReasonError,
 	projectValue,
+	scanShapeReads,
 } from '@orkestrel/reason'
 
 /**
@@ -213,33 +216,31 @@ export function checkToPremise(
 
 /**
  * Builds rich premises for one fired {@link Rule} by walking its premise atoms
- * and re-evaluating each against the working subject.
+ * and reading each from what the rule read.
  *
  * @remarks
- * A reason rule result carries only booleans, so this is the qualifier's own
- * premise-audit projection: each authored premise expression is flattened to its
- * atom leaves through `extractAtoms`, and each leaf's `Check` is re-evaluated through
- * the injected `evaluator`. A membership check (`any` / `none`) over an empty
- * array value is content-free and is skipped.
+ * Each authored premise expression is flattened to its atom leaves through `extractAtoms`,
+ * which lines up with the `checks` the rule result carries, so a premise cannot disagree with
+ * the pass. A rule with no result never ran, so its premises carry no `state` or `actual`.
  *
  * @param rule - The authored rule
- * @param working - The working subject to evaluate against
- * @param evaluator - The shared reason check evaluator
+ * @param resolved - The rule's result, absent when it never ran
  * @param labels - Optional field-to-label overrides, keyed by dot-joined field
  * @returns A fresh, ordered list of rich premises
  *
  * @example
  * ```ts
  * import { ruleToPremises } from '@orkestrel/qualifier'
- * import { createAtom, createEvaluator, createLogicalDefinition, createRule } from '@orkestrel/reason'
+ * import { createAtom, createRule } from '@orkestrel/reason'
  *
- * const gates = createLogicalDefinition('gates', 'Gates', [
- *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
- * ])
- * const evaluator = createEvaluator()
- * const premises = ruleToPremises(gates.rules[0], { licensed: false }, evaluator)
- *
- * premises[0]?.met // true
+ * const rule = createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true))
+ * const resolved = {
+ *   id: 'licensed',
+ *   state: 'met' as const,
+ *   premises: ['met' as const],
+ *   checks: [{ field: 'licensed', state: 'met' as const, actual: false }],
+ * }
+ * ruleToPremises(rule, resolved)[0]?.state // 'met'
  * ```
  */
 export function ruleToPremises(
@@ -329,19 +330,20 @@ export function reasonResultToProjection(
 		return result.value
 	}
 	if (definition.reasoning !== 'logical' || result.reasoning !== 'logical') return false
-	const projection: Record<string, unknown> = { conclusion: result.conclusion === 'met' }
-	// An unfired rule's keys read false first, so a key another rule fired keeps that rule's value.
-	for (const state of ['unmet', 'met']) {
-		for (const resolved of result.rules) {
-			if (resolved.state !== state) continue
-			const authored = definition.rules.find((rule) => rule.id === resolved.id)
-			if (authored === undefined) continue
-			for (const [key, value] of Object.entries(extractConclusions(authored.conclusion))) {
-				projection[key] = state === 'met' ? value : false
-			}
-		}
-	}
-	return projection
+	// An unfired rule's keys read false first, so a key another rule fired keeps that rule's value,
+	// and the pass's own conclusion goes last, so no rule can stand in for it.
+	const fields = ['unmet', 'met'].flatMap((state) =>
+		result.rules
+			.filter((resolved) => resolved.state === state)
+			.flatMap((resolved) => {
+				const authored = definition.rules.find((rule) => rule.id === resolved.id)
+				if (authored === undefined) return []
+				return Object.entries(extractConclusions(authored.conclusion)).map(
+					([key, value]): readonly [string, unknown] => [key, state === 'met' ? value : false],
+				)
+			}),
+	)
+	return Object.fromEntries([...fields, ['conclusion', result.conclusion === 'met']])
 }
 
 /**
@@ -350,7 +352,8 @@ export function reasonResultToProjection(
  * @remarks
  * A pass reading `qualification.gates.blocked` is unread because `gates` projected nothing, so
  * the question to ask is the one `gates` could not answer. A read of a pass that settled stays,
- * because that pass holds no such key.
+ * because that pass holds no such key. Passes run in order and each stores its expanded faults,
+ * so a chain of unread passes reaches the input that started it.
  *
  * @param faults - The faults every pass reported, in order
  * @param unread - The faults of each unread pass, by pass id
@@ -371,11 +374,150 @@ export function expandPassFaults(
 ): readonly AuditFault[] {
 	return filterUniqueFaults(
 		faults.flatMap((fault) => {
-			const [root, pass] = formatField(fault.path).split('.')
-			const leaves = root === QUALIFICATION_KEY && pass !== undefined ? unread.get(pass) : undefined
-			return leaves ?? [fault]
+			// A projection is read through an array path, and its second key is the pass id whole.
+			const { path } = fault
+			if (!isArray(path) || path[0] !== QUALIFICATION_KEY) return [fault]
+			return unread.get(path[1] ?? '') ?? [fault]
 		}),
 	)
+}
+
+/**
+ * Describes what the definition's shape cannot stand for: a read of a field it does not declare,
+ * and the reserved `qualification` key, which a default could otherwise fill.
+ *
+ * @remarks
+ * A read under `qualification` reads a pass's projection, and a pass's own conclusion keys are
+ * its own, so neither needs a declaration. A `raw` or `json` read is a warning.
+ *
+ * @param definition - The definition
+ * @returns The errors and warnings, empty with no shape
+ *
+ * @example
+ * ```ts
+ * import { numberShape, objectShape } from '@orkestrel/contract'
+ * import { createQualificationDefinition, scanDefinitionShape } from '@orkestrel/qualifier'
+ * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
+ *
+ * const pass = createLogicalDefinition('gates', 'Gates', [
+ *   createRule('r', [createAtom('agee', 'above', 1)], createAtom('ok', 'equals', true)),
+ * ])
+ * const shape = objectShape({ age: numberShape() })
+ * scanDefinitionShape(createQualificationDefinition('d', 'd', [pass], { shape })).errors.length // 1
+ * ```
+ */
+export function scanDefinitionShape(definition: QualificationDefinition): ShapeScan {
+	const { shape } = definition
+	if (shape === undefined) return { errors: [], warnings: [] }
+	const scans = definition.passes.map((pass) => {
+		if (pass.reasoning === 'logical') {
+			const enabled = pass.rules.filter((rule) => rule.enabled !== false)
+			const checks = enabled
+				.flatMap((rule) => rule.premises.flatMap((premise) => extractAtoms(premise)))
+				.map((atom) => atom.check)
+				.filter((check) => !readsProjection(check.field))
+			return scanShapeReads(shape, checks, [], new Set(collectConcluders(enabled).keys()))
+		}
+		const factors = pass.groups.flatMap((group) => group.factors)
+		return scanShapeReads(
+			shape,
+			factors
+				.flatMap((factor) => factor.checks ?? [])
+				.filter((check) => !readsProjection(check.field)),
+			factors
+				.flatMap((factor) => (factor.source.origin === 'static' ? [] : [factor.source.field]))
+				.filter((field) => !readsProjection(field)),
+			new Set(),
+		)
+	})
+	return {
+		errors: [
+			...(findFieldShape(shape, QUALIFICATION_KEY).shape === undefined
+				? []
+				: [`Shape declares the reserved key '${QUALIFICATION_KEY}'`]),
+			...new Set(scans.flatMap((scan) => scan.errors)),
+		],
+		warnings: [...new Set(scans.flatMap((scan) => scan.warnings))],
+	}
+}
+
+/**
+ * Determines whether a field reads a pass's projection under `qualification`.
+ *
+ * @param field - The field
+ * @returns True for an array path starting at the reserved key; false otherwise
+ *
+ * @example
+ * ```ts
+ * import { readsProjection } from '@orkestrel/qualifier'
+ *
+ * readsProjection(['qualification', 'gates', 'ok']) // true
+ * readsProjection('age')                            // false
+ * ```
+ */
+export function readsProjection(field: FieldPath): boolean {
+	return isArray(field) && field[0] === QUALIFICATION_KEY
+}
+
+/**
+ * Describes each rule concluding `conclusion`, which a pass's projection reserves for itself.
+ *
+ * @param definition - The definition
+ * @returns One message per such rule
+ *
+ * @example
+ * ```ts
+ * import { createQualificationDefinition, describeReservedConclusions } from '@orkestrel/qualifier'
+ * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
+ *
+ * const pass = createLogicalDefinition('gates', 'Gates', [
+ *   createRule('r', [createAtom('a', 'equals', 1)], createAtom('conclusion', 'equals', true)),
+ * ])
+ * describeReservedConclusions(createQualificationDefinition('d', 'd', [pass])).length // 1
+ * ```
+ */
+export function describeReservedConclusions(
+	definition: QualificationDefinition,
+): readonly string[] {
+	return definition.passes.flatMap((pass) =>
+		pass.reasoning !== 'logical'
+			? []
+			: pass.rules
+					.filter((rule) => Object.hasOwn(extractConclusions(rule.conclusion), 'conclusion'))
+					.map(
+						(rule) =>
+							`Rule '${rule.id}' in pass '${pass.id}' concludes the reserved key 'conclusion'`,
+					),
+	)
+}
+
+/**
+ * Determines whether a logical result holds a rule left unread.
+ *
+ * @param result - The result of a pass
+ * @returns True when a logical result holds such a rule; false otherwise
+ *
+ * @example
+ * ```ts
+ * import { hasUnreadRule } from '@orkestrel/qualifier'
+ *
+ * const rule = { id: 'r', state: 'unread' as const, premises: [], checks: [] }
+ * hasUnreadRule({
+ *   reasoning: 'logical',
+ *   conclusion: 'unread',
+ *   rules: [rule],
+ *   count: 0,
+ *   success: false,
+ *   trace: [],
+ *   errors: [],
+ *   faults: [],
+ *   repairs: [],
+ *   defaulted: [],
+ * }) // true
+ * ```
+ */
+export function hasUnreadRule(result: ReasonResult): boolean {
+	return result.reasoning === 'logical' && result.rules.some((rule) => rule.state === 'unread')
 }
 
 /**
@@ -512,36 +654,43 @@ export function mergeQualificationContext(
 }
 
 /**
- * Joins a ruling, its logical rule result, the pass, the pre-projection subject,
- * and an evaluator into a {@link Finding}.
+ * Joins a ruling, its logical rule result, the pass, and the pre-projection subject into a
+ * {@link Finding}.
  *
  * @remarks
- * `applied` reflects whether the ruling's rule fired. Premises are re-evaluated
- * against the same subject snapshot the pass evaluated, so a conclusion the pass
- * derived can never satisfy its own reported premise. The message interpolates
- * against that snapshot.
+ * `state` is the state of the ruling's rule. A rule the result omits reads `unmet` when it is
+ * disabled, which is authored, and `unread` otherwise, because a refused pass evaluated no rule.
+ * Premises come from what the rule read. The message interpolates against the subject.
  *
  * @param ruling - The authored ruling
  * @param pass - The pass the ruling's rule lives in
  * @param result - The pass's evaluated logical result
  * @param subject - The pre-projection subject snapshot the pass evaluated
- * @param evaluator - The shared reason check evaluator
  * @param labels - Optional field-to-label overrides, keyed by dot-joined field
  * @returns A fresh finding
  *
  * @example
  * ```ts
  * import { rulingToFinding } from '@orkestrel/qualifier'
- * import { createAtom, createEvaluator, createLogicalDefinition, createRule } from '@orkestrel/reason'
+ * import { createAtom, createLogicalDefinition, createRule } from '@orkestrel/reason'
  *
  * const gates = createLogicalDefinition('gates', 'Gates', [
  *   createRule('licensed', [createAtom('licensed', 'equals', false)], createAtom('blocked', 'equals', true)),
  * ])
  * const ruling = { id: 'license', pass: 'gates', rule: 'licensed', effect: 'restriction' as const }
- * const result = { reasoning: 'logical' as const, conclusion: true, rules: [{ id: 'licensed', applied: true, premises: [true] }], count: 1, success: true, trace: [], errors: [] }
- * const finding = rulingToFinding(ruling, gates, result, { licensed: false }, createEvaluator())
- *
- * finding.applied // true
+ * const result = {
+ *   reasoning: 'logical' as const,
+ *   conclusion: 'met' as const,
+ *   rules: [{ id: 'licensed', state: 'met' as const, premises: ['met' as const], checks: [] }],
+ *   count: 1,
+ *   success: true,
+ *   trace: [],
+ *   errors: [],
+ *   faults: [],
+ *   repairs: [],
+ *   defaulted: [],
+ * }
+ * rulingToFinding(ruling, gates, result, { licensed: false }).state // 'met'
  * ```
  */
 export function rulingToFinding(
@@ -560,8 +709,8 @@ export function rulingToFinding(
 		rule: ruling.rule,
 		effect: ruling.effect,
 		...(ruling.scope === undefined ? {} : { scope: ruling.scope }),
-		// A rule absent from the result is disabled, which is authored, so it reads as not firing.
-		state: entry?.state ?? 'unmet',
+		// A disabled rule is authored not to fire. Any other rule missing here was never evaluated.
+		state: entry?.state ?? (rule?.enabled === false ? 'unmet' : 'unread'),
 		...(ruling.message === undefined
 			? {}
 			: { message: interpolateMessage(ruling.message, subject) }),
@@ -570,10 +719,10 @@ export function rulingToFinding(
 }
 
 /**
- * Derives global eligibility from applied, unscoped findings.
+ * Derives global eligibility from unscoped findings whose rule is met.
  *
  * @remarks
- * Only findings that both applied and carry no `scope` shape global eligibility.
+ * Only findings that are `met` and carry no `scope` shape global eligibility.
  * A failed pass contributes a synthetic `referral` (fail-closed), passed through
  * `failed`.
  *
@@ -586,7 +735,7 @@ export function rulingToFinding(
  * ```ts
  * import { deriveFindingEligibility } from '@orkestrel/qualifier'
  *
- * const finding = { id: 'license', pass: 'gates', rule: 'licensed', effect: 'restriction' as const, applied: true, premises: [] }
+ * const finding = { id: 'license', pass: 'gates', rule: 'licensed', effect: 'restriction' as const, state: 'met' as const, premises: [] }
  * deriveFindingEligibility([finding]) // 'ineligible'
  * ```
  */
@@ -625,7 +774,7 @@ export function combineEligibilities(eligibilities: readonly Eligibility[]): Eli
  * Derives one eligibility per finding scope.
  *
  * @remarks
- * Only applied, scoped findings contribute. Each named scope combines its own
+ * Only scoped findings that are `met` contribute. Each named scope combines its own
  * findings' impacts by severity. An unmentioned scope is absent (eligible by
  * default at the program layer).
  *
@@ -636,24 +785,23 @@ export function combineEligibilities(eligibilities: readonly Eligibility[]): Eli
  * ```ts
  * import { deriveScopeEligibilities } from '@orkestrel/qualifier'
  *
- * const finding = { id: 'coastal', pass: 'wind', rule: 'coastal', effect: 'restriction' as const, scope: 'wind', applied: true, premises: [] }
+ * const finding = { id: 'coastal', pass: 'wind', rule: 'coastal', effect: 'restriction' as const, scope: 'wind', state: 'met' as const, premises: [] }
  * deriveScopeEligibilities([finding]) // { wind: 'ineligible' }
  * ```
  */
 export function deriveScopeEligibilities(
 	findings: readonly Finding[],
 ): Readonly<Record<string, Eligibility>> {
-	const grouped: Record<string, Eligibility[]> = {}
+	// A Map, because a scope may be named `constructor` or `__proto__`.
+	const grouped = new Map<string, Eligibility[]>()
 	for (const finding of findings) {
 		if (finding.state !== 'met' || finding.scope === undefined) continue
-		const current = grouped[finding.scope] ?? []
-		grouped[finding.scope] = [...current, EFFECT_ELIGIBILITIES[finding.effect]]
+		const current = grouped.get(finding.scope) ?? []
+		grouped.set(finding.scope, [...current, EFFECT_ELIGIBILITIES[finding.effect]])
 	}
-	const scopes: Record<string, Eligibility> = {}
-	for (const [scope, eligibilities] of Object.entries(grouped)) {
-		scopes[scope] = combineEligibilities(eligibilities)
-	}
-	return scopes
+	return Object.fromEntries(
+		[...grouped].map(([scope, eligibilities]) => [scope, combineEligibilities(eligibilities)]),
+	)
 }
 
 /**

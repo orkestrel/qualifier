@@ -45,6 +45,11 @@ export function buildPermutations<T>(list: readonly T[]): readonly T[][] {
 }
 
 /** Counts what a real engine is asked to validate. */
+// Answers one canned value, whatever the engine is asked.
+function answerWith(answer: unknown): unknown {
+	return answer
+}
+
 class CountingReason extends Reason {
 	readonly validations = createRecorder<[Definition]>()
 
@@ -57,6 +62,13 @@ class CountingReason extends Reason {
 /** Creates a real engine that counts what it is asked to validate. */
 export function createCountingReason(options: ReasonOptions) {
 	return new CountingReason(options)
+}
+
+/** Creates a real engine whose `reason` answers one canned value, as a foreign engine might. */
+export function createCannedEngine(answer: unknown) {
+	return Object.assign(new Reason({ reasoners: [] }), {
+		reason: answerWith.bind(undefined, answer),
+	})
 }
 
 /** Builds one `Finding` from the members a case cares about, defaulting the rest. */

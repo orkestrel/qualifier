@@ -24,19 +24,28 @@ import {
 	assertSubject,
 	describeEmptyLogicalPasses,
 	describeMissingReferences,
+	describeReservedConclusions,
 	describeUnknownTokens,
 	describeUnreadDerivations,
 	deriveFindingEligibility,
 	deriveScopeEligibilities,
 	expandPassFaults,
+	hasUnreadRule,
 	mapEngineError,
 	mergeQualificationContext,
 	qualificationToRecord,
 	quantitativeResultToDerivation,
 	reasonResultToProjection,
 	rulingToFinding,
+	scanDefinitionShape,
 } from './helpers.js'
-import { isQualificationPass, isRuling } from './validators.js'
+import {
+	isDefinitionMetadata,
+	isQualificationDefinition,
+	isQualificationPass,
+	isRuling,
+} from './validators.js'
+import { isArray, isRecord, isString } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
 import {
 	createLogicalReasoner,
@@ -44,6 +53,9 @@ import {
 	createReason,
 	createSubjectDoor,
 	describeFault,
+	filterUniqueFaults,
+	isContractShape,
+	isReasonResult,
 	scanShape,
 	findDuplicates,
 } from '@orkestrel/reason'
@@ -66,6 +78,7 @@ export class Qualifier implements QualifierInterface {
 	readonly #labels: Readonly<Record<string, string>> | undefined
 	readonly #door = createSubjectDoor()
 	readonly #valid = new WeakSet<QualificationDefinition>()
+	readonly #shaped = new WeakSet<QualificationDefinition>()
 	#destroyed = false
 
 	constructor(options?: QualifierOptions) {
@@ -149,7 +162,7 @@ export class Qualifier implements QualifierInterface {
 				throw new QualifierError(
 					'DEFINITION',
 					`Qualification definition is invalid: ${validation.errors.join(', ')}`,
-					{ definition: definition.id },
+					isRecord(definition) && isString(definition.id) ? { definition: definition.id } : {},
 				)
 			}
 			this.#valid.add(definition)
@@ -185,11 +198,22 @@ export class Qualifier implements QualifierInterface {
 	 */
 	validate(definition: QualificationDefinition): ReasonValidationResult {
 		this.#alive()
+		if (!isRecord(definition)) {
+			return { valid: false, errors: ['Definition must be a record'], warnings: [] }
+		}
 		const errors: string[] = []
 		const warnings: string[] = []
-		if (definition.id.length === 0) errors.push('Definition id must not be empty')
-		if (definition.name.length === 0) errors.push('Definition name must not be empty')
-		definition.passes.forEach((pass, index) => {
+		if (!isString(definition.id) || definition.id.length === 0) {
+			errors.push('Definition id must not be empty')
+		}
+		if (!isString(definition.name) || definition.name.length === 0) {
+			errors.push('Definition name must not be empty')
+		}
+		const authoredPasses: readonly unknown[] = isArray(definition.passes) ? definition.passes : []
+		const authoredRulings: unknown = definition.rulings === undefined ? [] : definition.rulings
+		if (!isArray(definition.passes)) errors.push('Definition must have a passes array')
+		if (!isArray(authoredRulings)) errors.push('Definition rulings must be an array')
+		authoredPasses.forEach((pass, index) => {
 			if (!isQualificationPass(pass)) {
 				errors.push(`Pass at index ${index} is not a valid qualification pass`)
 				return
@@ -199,19 +223,38 @@ export class Qualifier implements QualifierInterface {
 			for (const error of validation.errors) errors.push(`${pass.id}: ${error}`)
 			for (const warning of validation.warnings) warnings.push(`${pass.id}: ${warning}`)
 		})
-		;(definition.rulings ?? []).forEach((ruling, index) => {
+		const rulingEntries: readonly unknown[] = isArray(authoredRulings) ? authoredRulings : []
+		rulingEntries.forEach((ruling, index) => {
 			if (!isRuling(ruling)) errors.push(`Ruling at index ${index} is not a valid ruling`)
 		})
-		for (const id of findDuplicates(definition.passes)) errors.push(`Duplicate pass id '${id}'`)
-		for (const id of findDuplicates(definition.rulings ?? [])) {
-			errors.push(`Duplicate ruling id '${id}'`)
+		// The checks below read only what stood up, so one bad entry cannot throw past its own error.
+		const passes = authoredPasses.filter((pass) => isQualificationPass(pass))
+		const rulings = rulingEntries.filter((ruling) => isRuling(ruling))
+		const shape = isContractShape(definition.shape) ? definition.shape : undefined
+		if (definition.shape !== undefined && shape === undefined) {
+			errors.push('Definition shape is not a valid contract shape')
 		}
-		for (const reference of describeMissingReferences(definition)) errors.push(reference)
-		if (definition.shape !== undefined) errors.push(...scanShape(definition.shape))
-		errors.push(...describeUnknownTokens(definition))
-		if (definition.passes.length === 0) warnings.push('Definition has no passes')
-		for (const warning of describeEmptyLogicalPasses(definition)) warnings.push(warning)
-		for (const warning of describeUnreadDerivations(definition)) warnings.push(warning)
+		if (definition.metadata !== undefined && !isDefinitionMetadata(definition.metadata)) {
+			errors.push('Definition metadata must be a record of JSON values')
+		}
+		const readable: QualificationDefinition = {
+			id: definition.id,
+			name: definition.name,
+			passes,
+			rulings,
+			...(shape === undefined ? {} : { shape }),
+		}
+		for (const id of findDuplicates(passes)) errors.push(`Duplicate pass id '${id}'`)
+		for (const id of findDuplicates(rulings)) errors.push(`Duplicate ruling id '${id}'`)
+		for (const reference of describeMissingReferences(readable)) errors.push(reference)
+		for (const conclusion of describeReservedConclusions(readable)) errors.push(conclusion)
+		const scan = scanDefinitionShape(readable)
+		errors.push(...(shape === undefined ? [] : scanShape(shape)), ...scan.errors)
+		errors.push(...describeUnknownTokens(readable))
+		warnings.push(...scan.warnings)
+		if (passes.length === 0) warnings.push('Definition has no passes')
+		for (const warning of describeEmptyLogicalPasses(readable)) warnings.push(warning)
+		for (const warning of describeUnreadDerivations(readable)) warnings.push(warning)
 		return { valid: errors.length === 0, errors, warnings }
 	}
 
@@ -242,8 +285,18 @@ export class Qualifier implements QualifierInterface {
 
 	#qualify(subject: Subject, definition: QualificationDefinition): QualificationResult {
 		assertSubject(subject)
+		// Structure is checked even with `validate` off, once per definition, because the walk below
+		// reads it, and a malformed definition is the caller's error, never a raw TypeError.
+		if (!this.#shaped.has(definition)) {
+			if (!isQualificationDefinition(definition)) {
+				throw new QualifierError('DEFINITION', 'Qualification definition is malformed')
+			}
+			this.#shaped.add(definition)
+		}
 		const admission = this.#door.admit(subject, definition.shape)
 		const admitted = admission.subject
+		// A default could fill the reserved key, so the same rule holds for what the door admitted.
+		if (admitted !== undefined) assertSubject(admitted)
 		if (admitted === undefined) {
 			return this.#finish(
 				definition,
@@ -274,14 +327,30 @@ export class Qualifier implements QualifierInterface {
 			const evaluated = previous.subject
 			const result = this.#reason(evaluated, pass)
 
+			// An injected engine answers through an interface, so its result is read, not trusted.
+			if (!isReasonResult(result)) {
+				errors.push(`${pass.id}: The engine returned a malformed result`)
+				steps.push({ ...previous, success: false })
+				break
+			}
 			trace.push(...result.trace.map((entry) => `${pass.id}: ${entry}`))
 			// A fault's own string is written once at the end, after a read of an unread pass has
-			// become what that pass could not read. What no fault can say stays here.
+			// become what that pass could not read. What no fault can say stays here. `success` is
+			// the verdict, so one that says nothing, or a success beside an unread rule, is an error.
 			const said = new Set(result.faults.map((fault) => describeFault(fault)))
-			const fatal = result.errors.filter((entry) => !said.has(entry))
+			const fatal = [
+				...result.errors.filter((entry) => !said.has(entry)),
+				...(!result.success && result.errors.length === 0
+					? ['The pass failed and said nothing']
+					: []),
+				...(result.success && hasUnreadRule(result)
+					? ['The pass succeeded beside an unread rule']
+					: []),
+			]
 			errors.push(...fatal.map((entry) => `${pass.id}: ${entry}`))
-			faults.push(...result.faults)
-			if (result.faults.length > 0) unread.set(pass.id, result.faults)
+			const leaves = expandPassFaults(result.faults, unread)
+			faults.push(...leaves)
+			if (leaves.length > 0) unread.set(pass.id, leaves)
 
 			if (result.reasoning === 'quantitative') {
 				const derivation = quantitativeResultToDerivation(pass.id, result)
@@ -300,24 +369,25 @@ export class Qualifier implements QualifierInterface {
 
 			// An unread pass projects nothing and the run goes on, so a later restriction can still
 			// outrank the referral it reads as. An error no fault can say stops the run.
-			const context = result.success
-				? mergeQualificationContext(
-						previous.context,
-						pass.id,
-						reasonResultToProjection(pass, result),
-					)
-				: previous.context
+			const context =
+				result.success && fatal.length === 0
+					? mergeQualificationContext(
+							previous.context,
+							pass.id,
+							reasonResultToProjection(pass, result),
+						)
+					: previous.context
 			steps.push({
 				context,
 				subject: { ...admitted, ...qualificationToRecord(context) },
-				success: result.success,
+				success: result.success && fatal.length === 0,
 			})
 
 			if (fatal.length > 0) break
 			if (deriveFindingEligibility(findings) === 'ineligible') break
 		}
 
-		const leaves = expandPassFaults(faults, unread)
+		const leaves = filterUniqueFaults(faults)
 		return this.#finish(
 			definition,
 			findings,
@@ -350,8 +420,8 @@ export class Qualifier implements QualifierInterface {
 			trace: Object.freeze(trace),
 			errors: Object.freeze(errors),
 			faults: Object.freeze(faults),
-			repairs: admission.repairs,
-			defaulted: admission.defaulted,
+			repairs: Object.freeze([...admission.repairs]),
+			defaulted: Object.freeze([...admission.defaulted]),
 		})
 		this.#emitter.emit('qualify', qualification)
 		return qualification

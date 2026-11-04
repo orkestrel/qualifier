@@ -583,7 +583,7 @@ describe('helpers', () => {
 			expect(premise.actual).toBe(12)
 		})
 
-		it('rulingToFinding returns premises [] and applied false when the rule is absent', () => {
+		it('rulingToFinding returns premises [] and reads unread when the rule is absent', () => {
 			const ruling = createRuling('missing', 'gates', 'absent', 'restriction')
 			const found = rulingToFinding(
 				ruling,
@@ -603,7 +603,7 @@ describe('helpers', () => {
 				{ licensed: false },
 			)
 			expect(found.premises).toEqual([])
-			expect(found.state).toBe('unmet')
+			expect(found.state).toBe('unread')
 		})
 
 		it('rulingToFinding omits scope and message when the ruling lacks them', () => {
