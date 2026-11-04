@@ -1,4 +1,5 @@
 import type { Comparison } from '@orkestrel/reason'
+import { numberShape, objectShape, stringShape } from '@orkestrel/contract'
 import { describe, expect, it } from 'vitest'
 import {
 	assertSubject,
@@ -10,7 +11,9 @@ import {
 	deriveScopeEligibilities,
 	describeEmptyLogicalPasses,
 	describeMissingReferences,
+	describeUnknownTokens,
 	describeUnreadDerivations,
+	expandPassFaults,
 	findRule,
 	hasReservedKey,
 	interpolateMessage,
@@ -28,6 +31,7 @@ import {
 } from '@src/core'
 import {
 	createAtom,
+	createCompound,
 	createCheck,
 	createEvaluator,
 	createFactorGroup,
@@ -154,7 +158,7 @@ describe('helpers', () => {
 				comparison: 'above',
 				expected: 18,
 				actual: 25,
-				met: true,
+				state: 'met',
 			})
 			expect(sentence).toBe('age is more than 18 → met')
 		})
@@ -164,12 +168,12 @@ describe('helpers', () => {
 		})
 
 		it('falls back to "Premise" when field and description are both absent, met false', () => {
-			expect(renderPremise({ met: false })).toBe('Premise → not met')
+			expect(renderPremise({ state: 'unmet' })).toBe('Premise → not met')
 		})
 
 		it('renders a label override instead of the field', () => {
 			const sentence = renderPremise(
-				{ field: 'age', comparison: 'above', expected: 18, actual: 25, met: true },
+				{ field: 'age', comparison: 'above', expected: 18, actual: 25, state: 'met' },
 				{ age: 'Applicant age' },
 			)
 			expect(sentence).toBe('Applicant age is more than 18 → met')
@@ -181,7 +185,7 @@ describe('helpers', () => {
 				comparison: 'above',
 				expected: 18,
 				actual: 10,
-				met: false,
+				state: 'unmet',
 			})
 			expect(sentence).toBe('age is more than 18 → not met')
 		})
@@ -193,7 +197,7 @@ describe('helpers', () => {
 		})
 
 		it('renders a described premise with met false as not met', () => {
-			expect(renderPremise({ description: 'Applicant is enrolled', met: false })).toBe(
+			expect(renderPremise({ description: 'Applicant is enrolled', state: 'unmet' })).toBe(
 				'Applicant is enrolled → not met',
 			)
 		})
@@ -204,7 +208,7 @@ describe('helpers', () => {
 				comparison: 'above',
 				expected: 18,
 				actual: 25,
-				met: true,
+				state: 'met',
 				description: 'Applicant is enrolled',
 			})
 			expect(sentence).toBe('age is more than 18 → met')
@@ -214,7 +218,7 @@ describe('helpers', () => {
 			const sentence = renderPremise({
 				field: 'age',
 				description: 'Applicant is enrolled',
-				met: true,
+				state: 'met',
 			})
 			expect(sentence).toBe('Applicant is enrolled → met')
 		})
@@ -265,6 +269,9 @@ describe('helpers', () => {
 				success: true,
 				trace: ['step'],
 				errors: [],
+				faults: [],
+				repairs: [],
+				defaulted: [],
 			})
 			expect(derivation).toEqual({
 				id: 'cap',
@@ -286,6 +293,9 @@ describe('helpers', () => {
 				success: true,
 				trace: [],
 				errors: [],
+				faults: [],
+				repairs: [],
+				defaulted: [],
 			})
 			expect(projection).toBe(500)
 		})
@@ -293,12 +303,15 @@ describe('helpers', () => {
 		it('projects a logical conclusion and merged atom leaves', () => {
 			const projection = reasonResultToProjection(gatesPass, {
 				reasoning: 'logical',
-				conclusion: true,
+				conclusion: 'met',
 				count: 1,
 				success: true,
 				trace: [],
 				errors: [],
-				rules: [{ id: 'licensed', applied: true, premises: [true] }],
+				faults: [],
+				repairs: [],
+				defaulted: [],
+				rules: [{ id: 'licensed', state: 'met', premises: ['met'], checks: [] }],
 			})
 			expect(projection).toEqual({ conclusion: true, blocked: true })
 		})
@@ -307,11 +320,14 @@ describe('helpers', () => {
 			expect(
 				reasonResultToProjection(capPass, {
 					reasoning: 'logical',
-					conclusion: true,
+					conclusion: 'met',
 					count: 0,
 					success: true,
 					trace: [],
 					errors: [],
+					faults: [],
+					repairs: [],
+					defaulted: [],
 					rules: [],
 				}),
 			).toBe(false)
@@ -328,12 +344,15 @@ describe('helpers', () => {
 			const before = Object.prototype
 			reasonResultToProjection(polluted, {
 				reasoning: 'logical',
-				conclusion: true,
+				conclusion: 'met',
 				count: 1,
 				success: true,
 				trace: [],
 				errors: [],
-				rules: [{ id: 'proto', applied: true, premises: [true] }],
+				faults: [],
+				repairs: [],
+				defaulted: [],
+				rules: [{ id: 'proto', state: 'met', premises: ['met'], checks: [] }],
 			})
 			expect(Object.prototype).toBe(before)
 			expect(Object.hasOwn(Object.prototype, 'polluted')).toBe(false)
@@ -342,12 +361,15 @@ describe('helpers', () => {
 		it('projects only the conclusion when the applied rule id has no entry in definition.rules', () => {
 			const projection = reasonResultToProjection(gatesPass, {
 				reasoning: 'logical',
-				conclusion: true,
+				conclusion: 'met',
 				count: 1,
 				success: true,
 				trace: [],
 				errors: [],
-				rules: [{ id: 'ghost', applied: true, premises: [true] }],
+				faults: [],
+				repairs: [],
+				defaulted: [],
+				rules: [{ id: 'ghost', state: 'met', premises: ['met'], checks: [] }],
 			})
 			expect(projection).toEqual({ conclusion: true })
 		})
@@ -402,14 +424,14 @@ describe('helpers', () => {
 					pass: 'gates',
 					rule: 'licensed',
 					effect: 'referral',
-					applied: true,
+					state: 'met',
 				}),
 				buildFinding({
 					id: 'b',
 					pass: 'gates',
 					rule: 'blocked',
 					effect: 'restriction',
-					applied: true,
+					state: 'met',
 				}),
 			]
 			expect(deriveFindingEligibility(findings)).toBe('ineligible')
@@ -422,7 +444,7 @@ describe('helpers', () => {
 					pass: 'wind',
 					rule: 'coastal',
 					effect: 'restriction',
-					applied: true,
+					state: 'met',
 					scope: 'wind',
 				}),
 			]
@@ -442,7 +464,7 @@ describe('helpers', () => {
 					pass: 'wind',
 					rule: 'coastal',
 					effect: 'restriction',
-					applied: true,
+					state: 'met',
 					scope: 'wind',
 				}),
 				buildFinding({
@@ -450,7 +472,7 @@ describe('helpers', () => {
 					pass: 'gates',
 					rule: 'vacant',
 					effect: 'condition',
-					applied: true,
+					state: 'met',
 					scope: 'exWind',
 				}),
 			]
@@ -467,7 +489,7 @@ describe('helpers', () => {
 					pass: 'wind',
 					rule: 'coastal',
 					effect: 'condition',
-					applied: true,
+					state: 'met',
 					scope: 'wind',
 				}),
 				buildFinding({
@@ -475,7 +497,7 @@ describe('helpers', () => {
 					pass: 'wind',
 					rule: 'flood',
 					effect: 'restriction',
-					applied: true,
+					state: 'met',
 					scope: 'wind',
 				}),
 			]
@@ -489,7 +511,7 @@ describe('helpers', () => {
 					pass: 'wind',
 					rule: 'coastal',
 					effect: 'restriction',
-					applied: false,
+					state: 'unmet',
 					scope: 'wind',
 				}),
 				buildFinding({
@@ -497,7 +519,7 @@ describe('helpers', () => {
 					pass: 'gates',
 					rule: 'licensed',
 					effect: 'restriction',
-					applied: true,
+					state: 'met',
 				}),
 			]
 			expect(deriveScopeEligibilities(findings)).toEqual({})
@@ -505,37 +527,41 @@ describe('helpers', () => {
 	})
 
 	describe('ruleToPremises / checkToPremise / rulingToFinding', () => {
-		it('returns 0 premises for an empty membership value', () => {
-			const gates = createLogicalDefinition('gates', 'Gates', [
-				createRule(
-					'membership',
-					[createAtom('tag', 'any', [])],
-					createAtom('flagged', 'equals', true),
-				),
-			])
-			const evaluator = createEvaluator()
-			const membership = findRule(gates, 'membership')
-			expect(membership).toBeDefined()
-			const rulePremises =
-				membership === undefined ? [] : ruleToPremises(membership, { tag: 'coastal' }, evaluator)
-			expect(rulePremises).toHaveLength(0)
+		it('reads each premise from what the rule read, in extraction order', () => {
+			const rule = createRule(
+				'membership',
+				[
+					createCompound('and', [
+						createAtom('tag', 'any', ['coastal']),
+						createAtom('age', 'above', 1),
+					]),
+				],
+				createAtom('flagged', 'equals', true),
+			)
+			const premises = ruleToPremises(rule, {
+				id: 'membership',
+				state: 'unread',
+				premises: ['unread'],
+				checks: [
+					{ field: 'tag', state: 'met', actual: 'coastal' },
+					{ field: 'age', state: 'unread', actual: undefined },
+				],
+			})
+			expect(premises.map((premise) => premise.state)).toEqual(['met', 'unread'])
+			expect(premises[0]?.actual).toBe('coastal')
 		})
 
-		it('returns 1 premise for a non-empty membership check, met through a real evaluator', () => {
-			const gates = createLogicalDefinition('gates', 'Gates', [
-				createRule(
-					'membership',
-					[createAtom('tag', 'any', ['coastal'])],
-					createAtom('flagged', 'equals', true),
-				),
-			])
-			const evaluator = createEvaluator()
-			const membership = findRule(gates, 'membership')
-			expect(membership).toBeDefined()
-			const rulePremises =
-				membership === undefined ? [] : ruleToPremises(membership, { tag: 'coastal' }, evaluator)
-			expect(rulePremises).toHaveLength(1)
-			expect(rulePremises[0]?.met).toBe(true)
+		it('a rule that never ran has premises with no state, which render as unknown', () => {
+			const rule = createRule(
+				'membership',
+				[createAtom('tag', 'any', ['coastal'])],
+				createAtom('flagged', 'equals', true),
+			)
+			const premises = ruleToPremises(rule, undefined)
+			expect(premises).toHaveLength(1)
+			expect(premises[0]?.state).toBeUndefined()
+			expect(premises[0]?.actual).toBeUndefined()
+			expect(premises[0]?.field).toBe('tag')
 		})
 
 		it('checkToPremise includes label only when labels[field] is set', () => {
@@ -553,7 +579,7 @@ describe('helpers', () => {
 			const evaluator = createEvaluator()
 			const authored = createCheck('age', 'above', 18)
 			const premise = checkToPremise(authored, evaluator.evaluate(authored, { age: 12 }))
-			expect(premise.met).toBe(false)
+			expect(premise.state).toBe('unmet')
 			expect(premise.actual).toBe(12)
 		})
 
@@ -564,18 +590,20 @@ describe('helpers', () => {
 				gatesPass,
 				{
 					reasoning: 'logical',
-					conclusion: true,
+					conclusion: 'met',
 					count: 1,
 					success: true,
 					trace: [],
 					errors: [],
+					faults: [],
+					repairs: [],
+					defaulted: [],
 					rules: [],
 				},
 				{ licensed: false },
-				createEvaluator(),
 			)
 			expect(found.premises).toEqual([])
-			expect(found.applied).toBe(false)
+			expect(found.state).toBe('unmet')
 		})
 
 		it('rulingToFinding omits scope and message when the ruling lacks them', () => {
@@ -585,15 +613,17 @@ describe('helpers', () => {
 				gatesPass,
 				{
 					reasoning: 'logical',
-					conclusion: true,
+					conclusion: 'met',
 					count: 1,
 					success: true,
 					trace: [],
 					errors: [],
-					rules: [{ id: 'licensed', applied: true, premises: [true] }],
+					faults: [],
+					repairs: [],
+					defaulted: [],
+					rules: [{ id: 'licensed', state: 'met', premises: ['met'], checks: [] }],
 				},
 				{ licensed: false },
-				createEvaluator(),
 			)
 			expect('scope' in found).toBe(false)
 			expect('message' in found).toBe(false)
@@ -689,5 +719,51 @@ describe('helpers', () => {
 				"Quantitative pass 'cap' is never read by a later pass",
 			])
 		})
+	})
+})
+
+describe('expandPassFaults', () => {
+	const leaf = { reason: 'missing', path: 'age', expected: 'number' } as const
+	const read = {
+		reason: 'missing',
+		path: ['qualification', 'gates', 'ok'],
+		expected: 'boolean',
+	} as const
+
+	it('replaces a read of an unread pass with what that pass could not read', () => {
+		expect(expandPassFaults([read], new Map([['gates', [leaf]]]))).toEqual([leaf])
+	})
+
+	it('names one field once, however many passes reached it', () => {
+		expect(expandPassFaults([leaf, read], new Map([['gates', [leaf]]]))).toEqual([leaf])
+	})
+
+	it('keeps a read of a pass that settled, and any other fault', () => {
+		expect(expandPassFaults([read, leaf], new Map())).toEqual([read, leaf])
+	})
+})
+
+describe('describeUnknownTokens', () => {
+	const shape = objectShape({ age: numberShape(), address: objectShape({ city: stringShape() }) })
+
+	it('names a token no field answers, and no more', () => {
+		const definition = createQualificationDefinition('d', 'd', [], {
+			shape,
+			rulings: [
+				createRuling('a', 'p', 'r', 'referral', { message: 'Age {{age}} in {{address.city}}' }),
+				createRuling('b', 'p', 'r', 'referral', { message: 'Pass {{qualification.p.x}}' }),
+				createRuling('c', 'p', 'r', 'referral', { message: 'Bad {{agee}}' }),
+			],
+		})
+		expect(describeUnknownTokens(definition)).toEqual([
+			'Ruling \'c\' message reads "agee", and the shape does not declare it',
+		])
+	})
+
+	it('says nothing with no shape', () => {
+		const definition = createQualificationDefinition('d', 'd', [], {
+			rulings: [createRuling('c', 'p', 'r', 'referral', { message: 'Bad {{agee}}' })],
+		})
+		expect(describeUnknownTokens(definition)).toEqual([])
 	})
 })

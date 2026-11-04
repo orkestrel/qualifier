@@ -1,3 +1,4 @@
+import type { ContractInterface } from '@orkestrel/contract'
 import type {
 	QualificationDefinition,
 	QualificationEffect,
@@ -8,7 +9,29 @@ import type {
 	Ruling,
 	RulingInput,
 } from './types.js'
+import { createContract } from '@orkestrel/contract'
 import { Qualifier } from './Qualifier.js'
+import { createQualificationDefinitionShape } from './shapers.js'
+
+/**
+ * Creates the contract of a `QualificationDefinition`, its `schema` for an LLM, a tool, or MCP.
+ *
+ * @remarks
+ * Cross a definition on `is`, never `parse`, and hold the result, because building it walks the
+ * recursive expressions of its logical passes.
+ *
+ * @returns A contract over a qualification definition
+ *
+ * @example
+ * ```ts
+ * import { createQualificationDefinition, createQualificationDefinitionContract } from '@orkestrel/qualifier'
+ *
+ * createQualificationDefinitionContract().is(createQualificationDefinition('d', 'd', [])) // true
+ * ```
+ */
+export function createQualificationDefinitionContract(): ContractInterface<unknown> {
+	return createContract(createQualificationDefinitionShape())
+}
 
 /**
  * Creates one {@link QualifierInterface} over a reason engine.
@@ -72,7 +95,7 @@ export function createQualifier(options?: QualifierOptions): QualifierInterface 
  * @param id - The definition id
  * @param name - The display name
  * @param passes - The ordered qualification passes
- * @param input - Optional description, rulings, and metadata
+ * @param input - Optional description, rulings, metadata, and subject shape
  * @returns A fresh qualification definition
  *
  * @example
@@ -95,6 +118,7 @@ export function createQualificationDefinition(
 		...(input?.description === undefined ? {} : { description: input.description }),
 		...(input?.rulings === undefined ? {} : { rulings: [...input.rulings] }),
 		...(input?.metadata === undefined ? {} : { metadata: { ...input.metadata } }),
+		...(input?.shape === undefined ? {} : { shape: input.shape }),
 	}
 }
 

@@ -1,14 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
+	booleanShape,
+	numberShape,
+	objectShape,
+	optionalShape,
+	stringShape,
+} from '@orkestrel/contract'
+import {
 	createQualificationDefinition,
+	createQualificationDefinitionContract,
 	createQualifier,
 	createRuling,
+	isQualificationDefinition,
 	isQualifierError,
+	projectQualificationResult,
+	qualificationResultContract,
 	QUALIFICATION_KEY,
 	QualifierError,
 } from '@src/core'
 import {
 	createAtom,
+	createCompound,
 	createEvaluator,
 	createFactorGroup,
 	createFieldFactor,
@@ -22,8 +34,9 @@ import {
 	createTransform,
 	isReasonValidationResult,
 } from '@orkestrel/reason'
-import { createRecorder } from '@orkestrel/test'
+import { captureError, createRecorder } from '@orkestrel/test'
 import {
+	createCountingReason,
 	buildCapExcessGatesDefinition,
 	buildConditionDefinition,
 	buildContinuingLogicalDefinition,
@@ -48,7 +61,7 @@ describe('Qualifier', () => {
 			expect(finding).toEqual(
 				expect.objectContaining({
 					effect: 'referral',
-					applied: true,
+					state: 'met',
 					message: 'Coastal surcharge on 10 seats',
 				}),
 			)
@@ -101,7 +114,7 @@ describe('Qualifier', () => {
 			const finding = result.findings.find((entry) => entry.id === 'coastal')
 			expect(finding).toEqual(
 				expect.objectContaining({
-					applied: false,
+					state: 'unmet',
 					scope: 'wind',
 				}),
 			)
@@ -273,7 +286,12 @@ describe('Qualifier', () => {
 			const injected = createQualifier({ engine })
 			injected.destroy()
 			expect(() =>
-				engine.reason({ id: 'a', total: 1 }, createQuantitativeDefinition('cap', 'Cap', [])),
+				engine.reason(
+					{ id: 'a', total: 1 },
+					createQuantitativeDefinition('cap', 'Cap', [
+						createFactorGroup('g', 'sum', [createStaticFactor('s', 1)]),
+					]),
+				),
 			).not.toThrow()
 			engine.destroy()
 
@@ -476,12 +494,15 @@ describe('Qualifier', () => {
 			)
 
 			expect(Object.keys(result).sort()).toEqual([
+				'defaulted',
 				'derivations',
 				'eligibility',
 				'errors',
+				'faults',
 				'findings',
 				'id',
 				'name',
+				'repairs',
 				'scopes',
 				'success',
 				'trace',
@@ -492,7 +513,7 @@ describe('Qualifier', () => {
 	})
 
 	describe('evidence-snapshot integrity', () => {
-		it('re-evaluates premises against the pre-projection snapshot', () => {
+		it('reads premises from what each rule read, so a read of its own pass stays unread', () => {
 			const qualifier = createQualifier()
 			const definition = buildEvidenceSnapshotDefinition()
 			const result = qualifier.qualify({ id: 'risk-1' }, definition)
@@ -506,10 +527,12 @@ describe('Qualifier', () => {
 				matchesFieldPath(premise.field, ['qualification', 'p2', 'ready']),
 			)
 
-			expect(earlierFinding?.applied).toBe(true)
-			expect(earlierPremise).toEqual(expect.objectContaining({ met: true, actual: 42 }))
-			expect(samePassFinding?.applied).toBe(false)
-			expect(samePassPremise).toEqual(expect.objectContaining({ met: false, actual: undefined }))
+			expect(earlierFinding?.state).toBe('met')
+			expect(earlierPremise).toEqual(expect.objectContaining({ state: 'met', actual: 42 }))
+			expect(samePassFinding?.state).toBe('unread')
+			expect(samePassPremise).toEqual(
+				expect.objectContaining({ state: 'unread', actual: undefined }),
+			)
 			qualifier.destroy()
 		})
 	})
@@ -597,12 +620,13 @@ describe('Qualifier', () => {
 	})
 
 	describe('errors', () => {
-		it('maps a missing-reasoner engine throw to ENGINE', () => {
+		it('maps a missing reasoner to DEFINITION when validating, and to ENGINE when not', () => {
 			const engine = createReason({
 				reasoners: [createQuantitativeReasoner({ evaluator: createEvaluator() })],
 				bail: false,
 			})
 			const qualifier = createQualifier({ engine })
+			const unchecked = createQualifier({ engine, validate: false })
 			const gates = createLogicalDefinition('gates', 'Gates', [
 				createRule(
 					'flag',
@@ -613,6 +637,9 @@ describe('Qualifier', () => {
 			const definition = createQualificationDefinition('bad', 'Bad', [gates])
 
 			expect(() => qualifier.qualify({ id: 'x', flag: true }, definition)).toThrow(
+				expect.objectContaining({ code: 'DEFINITION', name: 'QualifierError' }),
+			)
+			expect(() => unchecked.qualify({ id: 'x', flag: true }, definition)).toThrow(
 				expect.objectContaining({ code: 'ENGINE', name: 'QualifierError' }),
 			)
 
@@ -796,5 +823,290 @@ describe('Qualifier', () => {
 
 			expect(destroyed.count).toBe(1)
 		})
+	})
+})
+
+describe('Qualifier — refusing what it cannot read', () => {
+	const ask = createAtom('credit', 'above', 600)
+	const flagged = createAtom('flagged', 'equals', true)
+	const blocked = createAtom('blocked', 'equals', true)
+	const gates = createLogicalDefinition('gates', 'Gates', [createRule('credit', [ask], flagged)])
+	const refer = createRuling('credit', 'gates', 'credit', 'restriction')
+
+	it('a pass left unread reads referral, names the field, and marks the finding unread', () => {
+		const qualifier = createQualifier()
+		const definition = createQualificationDefinition('d', 'd', [gates], { rulings: [refer] })
+		const result = qualifier.qualify({}, definition)
+		expect(result.eligibility).toBe('referral')
+		expect(result.success).toBe(false)
+		expect(result.errors).toEqual(['Field "credit" is missing'])
+		expect(result.faults).toEqual([{ reason: 'missing', path: 'credit', expected: 'number' }])
+		expect(result.findings.map((finding) => finding.state)).toEqual(['unread'])
+		qualifier.destroy()
+	})
+
+	it('the run goes on past an unread pass, so a later restriction outranks its referral', () => {
+		const qualifier = createQualifier()
+		const later = createLogicalDefinition('later', 'Later', [
+			createRule('roof', [createAtom('roof', 'equals', false)], blocked),
+		])
+		const definition = createQualificationDefinition('d', 'd', [gates, later], {
+			rulings: [refer, createRuling('roof', 'later', 'roof', 'restriction')],
+		})
+		const result = qualifier.qualify({ roof: false }, definition)
+		expect(result.eligibility).toBe('ineligible')
+		expect(result.success).toBe(false)
+		expect(result.faults.map((fault) => fault.path)).toEqual(['credit'])
+		qualifier.destroy()
+	})
+
+	it('a read of an unread pass names what that pass could not read', () => {
+		const qualifier = createQualifier()
+		const later = createLogicalDefinition('later', 'Later', [
+			createRule(
+				'reads',
+				[createAtom(['qualification', 'gates', 'flagged'], 'equals', true)],
+				blocked,
+			),
+		])
+		const definition = createQualificationDefinition('d', 'd', [gates, later])
+		const result = qualifier.qualify({}, definition)
+		expect(result.faults).toEqual([{ reason: 'missing', path: 'credit', expected: 'number' }])
+		expect(result.errors).toEqual(['Field "credit" is missing'])
+		qualifier.destroy()
+	})
+
+	it('a missing input never scores as zero: a derived score projects nothing', () => {
+		const qualifier = createQualifier()
+		const score = createQuantitativeDefinition('score', 'Score', [
+			createFactorGroup('g', 'sum', [createFieldFactor('f', 'points')]),
+		])
+		const denied = createLogicalDefinition('denied', 'Denied', [
+			createRule('low', [createAtom(['qualification', 'score'], 'below', 10)], blocked),
+		])
+		const definition = createQualificationDefinition('d', 'd', [score, denied], {
+			rulings: [createRuling('low', 'denied', 'low', 'restriction')],
+		})
+		const result = qualifier.qualify({}, definition)
+		expect(result.eligibility).toBe('referral')
+		expect(result.faults).toEqual([{ reason: 'missing', path: 'points', expected: 'number' }])
+		qualifier.destroy()
+	})
+
+	it('a settled pass projects false for what it did not fire, so a later read settles', () => {
+		const qualifier = createQualifier()
+		const later = createLogicalDefinition('later', 'Later', [
+			createRule(
+				'clear',
+				[createAtom(['qualification', 'gates', 'flagged'], 'equals', false)],
+				blocked,
+			),
+		])
+		const definition = createQualificationDefinition('d', 'd', [gates, later], {
+			rulings: [createRuling('clear', 'later', 'clear', 'referral')],
+		})
+		const result = qualifier.qualify({ credit: 100 }, definition)
+		expect(result.success).toBe(true)
+		expect(result.findings.map((finding) => finding.state)).toEqual(['met'])
+		qualifier.destroy()
+	})
+
+	it('an error no fault can say stops the run', () => {
+		const qualifier = createQualifier({ validate: false })
+		const bad = createLogicalDefinition('bad', 'Bad', [
+			createRule('reads', [createAtom('derived', 'above', 1)], createAtom('out', 'equals', true)),
+			createRule('never', [createAtom('x', 'equals', 2)], createAtom('derived', 'equals', 1)),
+		])
+		const later = createLogicalDefinition('later', 'Later', [
+			createRule('roof', [createAtom('roof', 'equals', false)], blocked),
+		])
+		const definition = createQualificationDefinition('d', 'd', [bad, later], {
+			rulings: [createRuling('roof', 'later', 'roof', 'restriction')],
+		})
+		const result = qualifier.qualify({ x: 1, roof: false }, definition)
+		expect(result.success).toBe(false)
+		expect(result.eligibility).toBe('referral')
+		expect(result.findings).toEqual([])
+		qualifier.destroy()
+	})
+})
+
+describe('Qualifier — premises read what the rule read', () => {
+	it('a premise on a key derived in the same pass reads the final overlay', () => {
+		const qualifier = createQualifier()
+		const pass = createLogicalDefinition('gates', 'Gates', [
+			createRule('adult', [createAtom('age', 'from', 18)], createAtom('adult', 'equals', true)),
+			createRule('ok', [createAtom('adult', 'equals', true)], createAtom('ok', 'equals', true)),
+		])
+		const definition = createQualificationDefinition('d', 'd', [pass], {
+			rulings: [createRuling('ok', 'gates', 'ok', 'referral')],
+		})
+		const result = qualifier.qualify({ age: 30 }, definition)
+		expect(result.findings[0]?.premises).toEqual([
+			{ field: 'adult', comparison: 'equals', expected: true, actual: true, state: 'met' },
+		])
+		qualifier.destroy()
+	})
+
+	it('a premise on an unread input reads unread, which renders as unknown', () => {
+		const qualifier = createQualifier()
+		const pass = createLogicalDefinition('gates', 'Gates', [
+			createRule('r', [createAtom('age', 'from', 18)], createAtom('ok', 'equals', true)),
+		])
+		const definition = createQualificationDefinition('d', 'd', [pass], {
+			rulings: [createRuling('r', 'gates', 'r', 'referral')],
+		})
+		const premise = qualifier.qualify({}, definition).findings[0]?.premises[0]
+		expect(premise?.state).toBe('unread')
+		qualifier.destroy()
+	})
+})
+
+describe('Qualifier — the door', () => {
+	const rule = createRule('r', [createAtom('age', 'from', 18)], createAtom('ok', 'equals', true))
+	const pass = createLogicalDefinition('gates', 'Gates', [rule])
+	const ruling = createRuling('r', 'gates', 'r', 'restriction')
+	const shape = objectShape({ age: numberShape(), licensed: optionalShape(booleanShape()) })
+	const definition = createQualificationDefinition('d', 'd', [pass], { rulings: [ruling], shape })
+
+	it('a subject the shape refuses reads referral with its faults, and no pass runs', () => {
+		const qualifier = createQualifier()
+		const result = qualifier.qualify({ age: 30, agee: 1 }, definition)
+		expect(result.eligibility).toBe('referral')
+		expect(result.success).toBe(false)
+		expect(result.faults).toEqual([{ reason: 'extra', path: ['agee'] }])
+		expect(result.errors).toEqual(['Field "agee" is not declared'])
+		expect(result.findings).toEqual([])
+		qualifier.destroy()
+	})
+
+	it('a lossless repair reaches the passes and is reported', () => {
+		const qualifier = createQualifier()
+		const result = qualifier.qualify({ age: '30' }, definition)
+		expect(result.success).toBe(true)
+		expect(result.eligibility).toBe('ineligible')
+		expect(result.repairs.map((fault) => fault.path)).toEqual([['age']])
+		qualifier.destroy()
+	})
+
+	it('a default fills through the door and is reported', () => {
+		const qualifier = createQualifier()
+		const filled = objectShape({
+			age: numberShape(),
+			licensed: optionalShape(booleanShape(), { default: false }),
+		})
+		const read = createLogicalDefinition('gates', 'Gates', [
+			createRule('r', [createAtom('licensed', 'equals', false)], createAtom('ok', 'equals', true)),
+		])
+		const result = qualifier.qualify(
+			{ age: 30 },
+			createQualificationDefinition('d', 'd', [read], { rulings: [ruling], shape: filled }),
+		)
+		expect(result.success).toBe(true)
+		expect(result.defaulted).toEqual([['licensed']])
+		qualifier.destroy()
+	})
+})
+
+describe('Qualifier — validate reads each pass through the engine', () => {
+	const okay = createAtom('ok', 'equals', true)
+
+	it('an error in a pass carries its id', () => {
+		const qualifier = createQualifier()
+		const pass = createLogicalDefinition('gates', 'Gates', [
+			createRule('r', [createCompound('and', [])], okay),
+		])
+		const validation = qualifier.validate(createQualificationDefinition('d', 'd', [pass]))
+		expect(validation.errors).toContain('gates: Connective "and" has 0 operands')
+		qualifier.destroy()
+	})
+
+	it('qualify refuses it before any pass runs', () => {
+		const qualifier = createQualifier()
+		const pass = createLogicalDefinition('gates', 'Gates', [
+			createRule('r', [createCompound('not', [])], okay),
+		])
+		const error = captureError(() =>
+			qualifier.qualify({}, createQualificationDefinition('d', 'd', [pass])),
+		)
+		expect(isQualifierError(error) && error.code).toBe('DEFINITION')
+		qualifier.destroy()
+	})
+
+	it('a pass may carry no shape, because the subject it reads holds qualification too', () => {
+		const qualifier = createQualifier()
+		const pass = createLogicalDefinition(
+			'gates',
+			'Gates',
+			[createRule('r', [createAtom('a', 'equals', 1)], okay)],
+			{ shape: objectShape({ a: numberShape() }) },
+		)
+		expect(qualifier.validate(createQualificationDefinition('d', 'd', [pass])).errors).toContain(
+			"Pass 'gates' may not carry a shape",
+		)
+		qualifier.destroy()
+	})
+
+	it('a shape on the definition must stand, and declare every message token', () => {
+		const qualifier = createQualifier()
+		const pass = createLogicalDefinition('gates', 'Gates', [
+			createRule('r', [createAtom('age', 'from', 18)], okay),
+		])
+		const patterned = createQualificationDefinition('d', 'd', [pass], {
+			rulings: [createRuling('r', 'gates', 'r', 'referral', { message: 'Age {{agee}}' })],
+			shape: objectShape({ age: numberShape(), code: stringShape({ pattern: /x/ }) }),
+		})
+		const validation = qualifier.validate(patterned)
+		expect(validation.errors).toContain(
+			'Field "code" carries a pattern, which does not survive JSON',
+		)
+		expect(validation.errors).toContain(
+			'Ruling \'r\' message reads "agee", and the shape does not declare it',
+		)
+		qualifier.destroy()
+	})
+
+	it('a definition validates once, remembered by identity', () => {
+		const pass = createLogicalDefinition('gates', 'Gates', [
+			createRule('r', [createAtom('age', 'from', 18)], okay),
+		])
+		const definition = createQualificationDefinition('d', 'd', [pass])
+		const engine = createCountingReason({ reasoners: [createLogicalReasoner()], bail: false })
+		const qualifier = createQualifier({ engine })
+		qualifier.qualify({ age: 30 }, definition)
+		qualifier.qualify({ age: 40 }, definition)
+		expect(engine.validations.count).toBe(1)
+		qualifier.destroy()
+		engine.destroy()
+	})
+})
+
+describe('Qualifier — published contracts', () => {
+	it('a definition crosses on is', () => {
+		const pass = createLogicalDefinition('gates', 'Gates', [
+			createRule('r', [createAtom('a', 'equals', 1)], createAtom('ok', 'equals', true)),
+		])
+		const definition = createQualificationDefinition('d', 'd', [pass], {
+			rulings: [createRuling('r', 'gates', 'r', 'referral')],
+		})
+		const contract = createQualificationDefinitionContract()
+		expect(contract.is(definition)).toBe(true)
+		expect(isQualificationDefinition(definition)).toBe(true)
+		expect(contract.is({ ...definition, extra: 1 })).toBe(false)
+	})
+
+	it('a result crosses as its projection, even over a hostile actual', () => {
+		const qualifier = createQualifier()
+		const pass = createLogicalDefinition('gates', 'Gates', [
+			createRule('r', [createAtom('a', 'above', 1)], createAtom('ok', 'equals', true)),
+		])
+		const definition = createQualificationDefinition('d', 'd', [pass], {
+			rulings: [createRuling('r', 'gates', 'r', 'referral')],
+		})
+		for (const a of [undefined, Number.NaN, 5, 'x', 1n, { b: Number.NaN }]) {
+			const result = qualifier.qualify({ a }, definition)
+			expect(qualificationResultContract.audit(projectQualificationResult(result))).toEqual([])
+		}
+		qualifier.destroy()
 	})
 })

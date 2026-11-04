@@ -133,7 +133,7 @@ describe('validators', () => {
 			comparison: 'above',
 			expected: 20,
 			actual: 30,
-			met: true,
+			state: 'met',
 		}
 
 		it('accepts extra members and leaves unknown-typed members unchecked', () => {
@@ -174,7 +174,8 @@ describe('validators', () => {
 			expect(isPremise({ ...valid, label: 1 })).toBe(false)
 			expect(isPremise({ ...valid, description: 1 })).toBe(false)
 			expect(isPremise({ ...valid, comparison: 'near' })).toBe(false)
-			expect(isPremise({ ...valid, met: 'yes' })).toBe(false)
+			expect(isPremise({ ...valid, state: 'yes' })).toBe(false)
+			expect(isPremise({ ...valid, state: true })).toBe(false)
 		})
 
 		it('rejects arrays', () => {
@@ -182,10 +183,10 @@ describe('validators', () => {
 		})
 
 		it('returns false without throwing on adversarial objects', () => {
-			const cyclic: Record<string, unknown> = { met: 'yes' }
+			const cyclic: Record<string, unknown> = { state: 'yes' }
 			cyclic.self = cyclic
-			const nullPrototype = Object.assign(Object.create(null), { met: 'yes' })
-			const throwing = Object.defineProperty({}, 'met', {
+			const nullPrototype = Object.assign(Object.create(null), { state: 'yes' })
+			const throwing = Object.defineProperty({}, 'state', {
 				get() {
 					throw new Error('blocked read')
 				},
@@ -211,9 +212,9 @@ describe('validators', () => {
 			rule: 'licensed',
 			effect: 'restriction',
 			scope: 'wind',
-			applied: true,
+			state: 'met',
 			message: 'A license is required',
-			premises: [{ field: 'licensed', comparison: 'equals', expected: false, met: true }],
+			premises: [{ field: 'licensed', comparison: 'equals', expected: false, state: 'met' }],
 		}
 
 		it('accepts extra members', () => {
@@ -226,7 +227,7 @@ describe('validators', () => {
 				readonly pass = valid.pass
 				readonly rule = valid.rule
 				readonly effect = valid.effect
-				readonly applied = valid.applied
+				readonly state = valid.state
 				readonly premises = valid.premises
 			})()
 			expect(isFinding(value)).toBe(true)
@@ -238,7 +239,7 @@ describe('validators', () => {
 				pass: valid.pass,
 				rule: valid.rule,
 				effect: valid.effect,
-				applied: valid.applied,
+				state: valid.state,
 				premises: valid.premises,
 			}
 			expect(isFinding(minimal)).toBe(true)
@@ -251,7 +252,8 @@ describe('validators', () => {
 			expect(isFinding({ ...valid, rule: 1 })).toBe(false)
 			expect(isFinding({ ...valid, effect: 'notice' })).toBe(false)
 			expect(isFinding({ ...valid, scope: 1 })).toBe(false)
-			expect(isFinding({ ...valid, applied: 'yes' })).toBe(false)
+			expect(isFinding({ ...valid, state: 'yes' })).toBe(false)
+			expect(isFinding({ ...valid, state: true })).toBe(false)
 			expect(isFinding({ ...valid, message: 1 })).toBe(false)
 			expect(isFinding({ ...valid, premises: [false] })).toBe(false)
 		})
@@ -290,6 +292,9 @@ describe('validators', () => {
 			success: true,
 			trace: ['cap: 1000000'],
 			errors: [],
+			faults: [],
+			repairs: [],
+			defaulted: [],
 		}
 
 		it('accepts extra members', () => {
@@ -347,6 +352,9 @@ describe('validators', () => {
 					success: true,
 					trace: [],
 					errors: [],
+					faults: [],
+					repairs: [],
+					defaulted: [],
 				}),
 			).toBe(false)
 		})
@@ -364,7 +372,7 @@ describe('validators', () => {
 					pass: 'gates',
 					rule: 'licensed',
 					effect: 'restriction',
-					applied: true,
+					state: 'met',
 					premises: [],
 				},
 			],
@@ -372,6 +380,9 @@ describe('validators', () => {
 			success: true,
 			trace: ['qualified'],
 			errors: [],
+			faults: [],
+			repairs: [],
+			defaulted: [],
 		}
 
 		it('accepts extra members', () => {
@@ -406,6 +417,15 @@ describe('validators', () => {
 				}
 				get errors() {
 					return valid.errors
+				}
+				get faults() {
+					return valid.faults
+				}
+				get repairs() {
+					return valid.repairs
+				}
+				get defaulted() {
+					return valid.defaulted
 				}
 			})()
 			expect(isQualificationResult(value)).toBe(true)

@@ -1,6 +1,7 @@
-import type { FieldPath, JSONValue } from '@orkestrel/contract'
+import type { AuditFault, ContractShape, FieldPath, JSONValue } from '@orkestrel/contract'
 import type { EmitterErrorHandler, EmitterHooks, EmitterInterface } from '@orkestrel/emitter'
 import type {
+	CheckState,
 	Comparison,
 	LogicalDefinition,
 	QuantitativeDefinition,
@@ -35,6 +36,7 @@ export interface QualificationInput {
 	readonly description?: string
 	readonly rulings?: readonly Ruling[]
 	readonly metadata?: Readonly<Record<string, JSONValue>>
+	readonly shape?: ContractShape
 }
 
 /** Represents an authored consequence for one rule in one logical pass. */
@@ -56,8 +58,9 @@ export interface Ruling {
  * carries neither and renders from `description` instead. The checked form
  * renders only when `field` and `comparison` are both present, and
  * `description` then goes unused; a premise missing either half of the
- * checked pair renders as described instead. `met` is three-state: `true`
- * (met), `false` (not met), or absent (not evaluated, rendered as unknown).
+ * checked pair renders as described instead. `state` is what the rule read: `met`,
+ * `unmet`, or `unread`. It is absent when the rule never ran, because it was disabled or
+ * the premise is only described, and both `unread` and absent render as unknown.
  */
 export interface Premise {
 	readonly field?: FieldPath
@@ -66,17 +69,23 @@ export interface Premise {
 	readonly comparison?: Comparison
 	readonly expected?: unknown
 	readonly actual?: unknown
-	readonly met?: boolean
+	readonly state?: CheckState
 }
 
-/** Represents one resolved ruling. */
+/**
+ * Represents one resolved ruling.
+ *
+ * @remarks
+ * `state` is the state of the ruling's rule, so only `met` applies the ruling's effect. A rule
+ * left `unread` is no answer either way, and the pass it sits in reads `referral`.
+ */
 export interface Finding {
 	readonly id: string
 	readonly pass: string
 	readonly rule: string
 	readonly effect: QualificationEffect
 	readonly scope?: string
-	readonly applied: boolean
+	readonly state: CheckState
 	readonly message?: string
 	readonly premises: readonly Premise[]
 }
@@ -90,7 +99,13 @@ export interface Derivation {
 	readonly errors: readonly string[]
 }
 
-/** Represents a pure authored qualification definition. */
+/**
+ * Represents a pure authored qualification definition.
+ *
+ * @remarks
+ * `shape` declares the subject, which then passes a door before any pass reads it. A pass
+ * carries no shape of its own, because the subject it reads holds `qualification` too.
+ */
 export interface QualificationDefinition {
 	readonly id: string
 	readonly name: string
@@ -98,9 +113,19 @@ export interface QualificationDefinition {
 	readonly passes: readonly QualificationPass[]
 	readonly rulings?: readonly Ruling[]
 	readonly metadata?: Readonly<Record<string, JSONValue>>
+	readonly shape?: ContractShape
 }
 
-/** Represents one subject's complete qualification outcome. */
+/**
+ * Represents one subject's complete qualification outcome.
+ *
+ * @remarks
+ * `success` is false exactly when `errors` holds an entry, and then `eligibility` carries at
+ * least a `referral`. `faults` names each input the run could not read, with a read of an
+ * unread pass's projection replaced by what that pass could not read, and `errors` holds one
+ * string per fault plus what no fault can say. `repairs` and `defaulted` report what the door
+ * changed.
+ */
 export interface QualificationResult {
 	readonly id: string
 	readonly name: string
@@ -111,6 +136,9 @@ export interface QualificationResult {
 	readonly success: boolean
 	readonly trace: readonly string[]
 	readonly errors: readonly string[]
+	readonly faults: readonly AuditFault[]
+	readonly repairs: readonly AuditFault[]
+	readonly defaulted: readonly FieldPath[]
 }
 
 /** Represents a coded {@link QualifierError} programmer-error code. */

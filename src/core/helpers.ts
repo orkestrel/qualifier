@@ -1,3 +1,4 @@
+import type { AuditFault, JSONValue } from '@orkestrel/contract'
 import type {
 	Derivation,
 	Eligibility,
@@ -7,17 +8,18 @@ import type {
 	QualificationDefinition,
 	QualificationPass,
 	QualificationProjection,
+	QualificationResult,
 	Ruling,
 } from './types.js'
 import type {
 	Check,
 	CheckResult,
-	EvaluatorInterface,
 	LogicalDefinition,
 	LogicalResult,
 	QuantitativeResult,
 	ReasonResult,
 	Rule,
+	RuleResult,
 	Subject,
 } from '@orkestrel/reason'
 import { EFFECT_ELIGIBILITIES, ELIGIBILITY_PRECEDENCE, QUALIFICATION_KEY } from './constants.js'
@@ -26,9 +28,12 @@ import { isArray, isError, isFiniteNumber, isRecord, resolveField } from '@orkes
 import {
 	extractAtoms,
 	extractConclusions,
+	filterUniqueFaults,
+	findFieldShape,
 	formatField,
 	isBounds,
 	isReasonError,
+	projectValue,
 } from '@orkestrel/reason'
 
 /**
@@ -153,15 +158,15 @@ export function renderValue(value: unknown): string {
  * ```ts
  * import { renderPremise } from '@orkestrel/qualifier'
  *
- * renderPremise({ field: 'age', comparison: 'above', expected: 18, actual: 25, met: true })
+ * renderPremise({ field: 'age', comparison: 'above', expected: 18, actual: 25, state: 'met' })
  * // 'age is more than 18 → met'
  *
- * renderPremise({ description: 'Applicant is enrolled', met: true })
+ * renderPremise({ description: 'Applicant is enrolled', state: 'met' })
  * // 'Applicant is enrolled → met'
  * ```
  */
 export function renderPremise(entry: Premise, labels?: Readonly<Record<string, string>>): string {
-	const status = entry.met === undefined ? 'unknown' : entry.met ? 'met' : 'not met'
+	const status = entry.state === 'met' ? 'met' : entry.state === 'unmet' ? 'not met' : 'unknown'
 	if (entry.field === undefined || entry.comparison === undefined) {
 		return `${entry.description ?? 'Premise'} → ${status}`
 	}
@@ -176,7 +181,7 @@ export function renderPremise(entry: Premise, labels?: Readonly<Record<string, s
  * `CheckResult`.
  *
  * @param check - The authored check
- * @param result - The evaluated check result carrying the resolved `actual` and `met`
+ * @param result - The evaluated check result carrying the resolved `actual` and `state`
  * @param labels - Optional field-to-label overrides, keyed by dot-joined field
  * @returns A fresh premise
  *
@@ -186,8 +191,8 @@ export function renderPremise(entry: Premise, labels?: Readonly<Record<string, s
  * import { createCheck } from '@orkestrel/reason'
  *
  * const authored = createCheck('age', 'above', 18)
- * checkToPremise(authored, { field: 'age', actual: 25, met: true })
- * // { field: 'age', comparison: 'above', expected: 18, actual: 25, met: true }
+ * checkToPremise(authored, { field: 'age', actual: 25, state: 'met' })
+ * // { field: 'age', comparison: 'above', expected: 18, actual: 25, state: 'met' }
  * ```
  */
 export function checkToPremise(
@@ -202,7 +207,7 @@ export function checkToPremise(
 		comparison: check.operator,
 		expected: check.value,
 		actual: result.actual,
-		met: result.met,
+		state: result.state,
 	}
 }
 
@@ -239,25 +244,25 @@ export function checkToPremise(
  */
 export function ruleToPremises(
 	rule: Rule,
-	working: Subject,
-	evaluator: EvaluatorInterface,
+	resolved: RuleResult | undefined,
 	labels?: Readonly<Record<string, string>>,
 ): readonly Premise[] {
-	const output: Premise[] = []
-	for (const premise of rule.premises) {
-		for (const atom of extractAtoms(premise)) {
-			const { check } = atom
-			if (
-				(check.operator === 'any' || check.operator === 'none') &&
-				isArray(check.value) &&
-				check.value.length === 0
-			) {
-				continue
-			}
-			output.push(checkToPremise(check, evaluator.evaluate(check, working), labels))
-		}
-	}
-	return output
+	return rule.premises
+		.flatMap((premise) => extractAtoms(premise))
+		.map((atom, index) => {
+			const read = resolved?.checks[index]
+			if (read !== undefined) return checkToPremise(atom.check, read, labels)
+			const {
+				state: _state,
+				actual: _actual,
+				...unrun
+			} = checkToPremise(
+				atom.check,
+				{ field: atom.check.field, state: 'unread', actual: undefined },
+				labels,
+			)
+			return unrun
+		})
 }
 
 /**
@@ -324,15 +329,117 @@ export function reasonResultToProjection(
 		return result.value
 	}
 	if (definition.reasoning !== 'logical' || result.reasoning !== 'logical') return false
-	const projection: Record<string, unknown> = { conclusion: result.conclusion }
-	for (const resolved of result.rules) {
-		if (!resolved.applied) continue
-		const authored = definition.rules.find((rule) => rule.id === resolved.id)
-		if (authored === undefined) continue
-		const conclusions = extractConclusions(authored.conclusion)
-		for (const [key, value] of Object.entries(conclusions)) projection[key] = value
+	const projection: Record<string, unknown> = { conclusion: result.conclusion === 'met' }
+	// An unfired rule's keys read false first, so a key another rule fired keeps that rule's value.
+	for (const state of ['unmet', 'met']) {
+		for (const resolved of result.rules) {
+			if (resolved.state !== state) continue
+			const authored = definition.rules.find((rule) => rule.id === resolved.id)
+			if (authored === undefined) continue
+			for (const [key, value] of Object.entries(extractConclusions(authored.conclusion))) {
+				projection[key] = state === 'met' ? value : false
+			}
+		}
 	}
 	return projection
+}
+
+/**
+ * Replaces a read of an unread pass's projection with what that pass could not read.
+ *
+ * @remarks
+ * A pass reading `qualification.gates.blocked` is unread because `gates` projected nothing, so
+ * the question to ask is the one `gates` could not answer. A read of a pass that settled stays,
+ * because that pass holds no such key.
+ *
+ * @param faults - The faults every pass reported, in order
+ * @param unread - The faults of each unread pass, by pass id
+ * @returns The input faults, once per field
+ *
+ * @example
+ * ```ts
+ * import { expandPassFaults } from '@orkestrel/qualifier'
+ *
+ * const leaf = { reason: 'missing', path: 'age', expected: 'number' } as const
+ * const read = { reason: 'missing', path: ['qualification', 'gates', 'ok'], expected: 'boolean' } as const
+ * expandPassFaults([read], new Map([['gates', [leaf]]])) // [leaf]
+ * ```
+ */
+export function expandPassFaults(
+	faults: readonly AuditFault[],
+	unread: ReadonlyMap<string, readonly AuditFault[]>,
+): readonly AuditFault[] {
+	return filterUniqueFaults(
+		faults.flatMap((fault) => {
+			const [root, pass] = formatField(fault.path).split('.')
+			const leaves = root === QUALIFICATION_KEY && pass !== undefined ? unread.get(pass) : undefined
+			return leaves ?? [fault]
+		}),
+	)
+}
+
+/**
+ * Describes each message token no field of the definition's shape answers.
+ *
+ * @remarks
+ * A token under `qualification` reads a pass's projection, which no shape declares.
+ *
+ * @param definition - The definition
+ * @returns One message per unknown token, empty with no shape
+ *
+ * @example
+ * ```ts
+ * import { numberShape, objectShape } from '@orkestrel/contract'
+ * import { createQualificationDefinition, createRuling, describeUnknownTokens } from '@orkestrel/qualifier'
+ *
+ * const ruling = createRuling('r', 'gates', 'licensed', 'referral', { message: 'Age {{agee}}' })
+ * const shape = objectShape({ age: numberShape() })
+ * describeUnknownTokens(createQualificationDefinition('d', 'd', [], { rulings: [ruling], shape }))
+ * // ['Ruling \'r\' message reads "agee", and the shape does not declare it']
+ * ```
+ */
+export function describeUnknownTokens(definition: QualificationDefinition): readonly string[] {
+	const { shape } = definition
+	if (shape === undefined) return []
+	return (definition.rulings ?? []).flatMap((ruling) =>
+		[...(ruling.message ?? '').matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)].flatMap((match) => {
+			const token = match[1] ?? ''
+			const path = token.split('.')
+			if (path[0] === QUALIFICATION_KEY || findFieldShape(shape, path).declared) return []
+			return [`Ruling '${ruling.id}' message reads "${token}", and the shape does not declare it`]
+		}),
+	)
+}
+
+/**
+ * Projects a result to the JSON its contract reads.
+ *
+ * @remarks
+ * A premise's `actual` holds whatever the subject held and a derivation's `value` may be `NaN`,
+ * so a result crosses a boundary as this projection, each `actual` on its own budget.
+ *
+ * @param result - The qualification result
+ * @returns Its JSON projection, which `qualificationResultContract` admits
+ *
+ * @example
+ * ```ts
+ * import { createQualificationDefinition, createQualifier, projectQualificationResult, qualificationResultContract } from '@orkestrel/qualifier'
+ *
+ * const qualifier = createQualifier()
+ * const result = qualifier.qualify({}, createQualificationDefinition('d', 'd', []))
+ * qualificationResultContract.is(projectQualificationResult(result)) // true
+ * qualifier.destroy()
+ * ```
+ */
+export function projectQualificationResult(result: QualificationResult): JSONValue | undefined {
+	const findings = result.findings.map((finding) => ({
+		...finding,
+		premises: finding.premises.map((premise) => ({
+			...premise,
+			actual: projectValue(premise.actual),
+		})),
+	}))
+	return projectValue({ ...result, findings }, new Set(), { left: Number.POSITIVE_INFINITY })
 }
 
 /**
@@ -442,20 +549,19 @@ export function rulingToFinding(
 	pass: QualificationPass,
 	result: LogicalResult,
 	subject: Subject,
-	evaluator: EvaluatorInterface,
 	labels?: Readonly<Record<string, string>>,
 ): Finding {
 	const entry = result.rules.find((resolved) => resolved.id === ruling.rule)
-	const applied = entry?.applied ?? false
 	const rule = pass.reasoning === 'logical' ? findRule(pass, ruling.rule) : undefined
-	const premises = rule === undefined ? [] : ruleToPremises(rule, subject, evaluator, labels)
+	const premises = rule === undefined ? [] : ruleToPremises(rule, entry, labels)
 	return {
 		id: ruling.id,
 		pass: ruling.pass,
 		rule: ruling.rule,
 		effect: ruling.effect,
 		...(ruling.scope === undefined ? {} : { scope: ruling.scope }),
-		applied,
+		// A rule absent from the result is disabled, which is authored, so it reads as not firing.
+		state: entry?.state ?? 'unmet',
 		...(ruling.message === undefined
 			? {}
 			: { message: interpolateMessage(ruling.message, subject) }),
@@ -489,7 +595,7 @@ export function deriveFindingEligibility(
 	failed = false,
 ): Eligibility {
 	const eligibilities = findings
-		.filter((finding) => finding.applied && finding.scope === undefined)
+		.filter((finding) => finding.state === 'met' && finding.scope === undefined)
 		.map((finding) => EFFECT_ELIGIBILITIES[finding.effect])
 	if (failed) eligibilities.push('referral')
 	return combineEligibilities(eligibilities)
@@ -539,7 +645,7 @@ export function deriveScopeEligibilities(
 ): Readonly<Record<string, Eligibility>> {
 	const grouped: Record<string, Eligibility[]> = {}
 	for (const finding of findings) {
-		if (!finding.applied || finding.scope === undefined) continue
+		if (finding.state !== 'met' || finding.scope === undefined) continue
 		const current = grouped[finding.scope] ?? []
 		grouped[finding.scope] = [...current, EFFECT_ELIGIBILITIES[finding.effect]]
 	}

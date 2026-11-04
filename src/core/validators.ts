@@ -11,6 +11,7 @@ import type {
 import {
 	arrayOf,
 	isBoolean,
+	isJSONValue,
 	isNumber,
 	isRecord,
 	isString,
@@ -19,8 +20,12 @@ import {
 	recordOf,
 	whereOf,
 } from '@orkestrel/contract'
+import { ELIGIBILITIES, QUALIFICATION_EFFECTS } from './constants.js'
 import {
+	isAuditFault,
+	isCheckState,
 	isComparison,
+	isContractShape,
 	isFieldPath,
 	isLogicalDefinition,
 	isQuantitativeDefinition,
@@ -36,7 +41,7 @@ import {
  * @param value - The value to test
  * @returns True if `value` is one of the eligibility literals; false otherwise
  */
-export const isEligibility = literalOf('eligible', 'ineligible', 'referral')
+export const isEligibility = literalOf(...ELIGIBILITIES)
 
 /**
  * Determines whether a value is a {@link QualificationEffect} literal.
@@ -48,7 +53,7 @@ export const isEligibility = literalOf('eligible', 'ineligible', 'referral')
  * @param value - The value to test
  * @returns True if `value` is one of the effect literals; false otherwise
  */
-export const isQualificationEffect = literalOf('restriction', 'referral', 'condition')
+export const isQualificationEffect = literalOf(...QUALIFICATION_EFFECTS)
 
 /**
  * Determines whether a value is an open string-keyed record of {@link Eligibility} values.
@@ -90,9 +95,9 @@ export function isPremise(value: unknown): value is Premise {
 			label: isString,
 			description: isString,
 			comparison: isComparison,
-			met: isBoolean,
+			state: isCheckState,
 		},
-		['field', 'label', 'description', 'comparison', 'met'],
+		['field', 'label', 'description', 'comparison', 'state'],
 	)(value)
 }
 
@@ -116,7 +121,7 @@ export function isFinding(value: unknown): value is Finding {
 			rule: isString,
 			effect: isQualificationEffect,
 			scope: isString,
-			applied: isBoolean,
+			state: isCheckState,
 			message: isString,
 			premises: arrayOf(isPremise),
 		},
@@ -170,6 +175,9 @@ export function isQualificationResult(value: unknown): value is QualificationRes
 		success: isBoolean,
 		trace: arrayOf(isString),
 		errors: arrayOf(isString),
+		faults: arrayOf(isAuditFault),
+		repairs: arrayOf(isAuditFault),
+		defaulted: arrayOf(isFieldPath),
 	})(value)
 }
 
@@ -231,8 +239,9 @@ export function isQualificationDefinition(value: unknown): value is Qualificatio
 			description: isString,
 			passes: arrayOf(isQualificationPass),
 			rulings: arrayOf(isRuling),
-			metadata: isRecord,
+			metadata: whereOf(isRecord, (record) => Object.values(record).every(isJSONValue)),
+			shape: isContractShape,
 		},
-		['description', 'rulings', 'metadata'],
+		['description', 'rulings', 'metadata', 'shape'],
 	)(value)
 }

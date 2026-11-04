@@ -139,6 +139,9 @@ describe('failing engine', () => {
 			success: false,
 			trace: ['engine trace'],
 			errors: ['engine boom'],
+			faults: [],
+			repairs: [],
+			defaulted: [],
 		})
 		expect(setup.reasonFailing({ id: 'subject' }, pass)).toBe(setup.FAILING_RESULT)
 		expect(setup.reasonFailing([{ id: 'first' }, { id: 'second' }], pass)).toEqual([

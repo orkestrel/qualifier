@@ -12,6 +12,12 @@ export const DEFAULT_QUALIFIER_VALIDATE = true
  */
 export const QUALIFICATION_KEY = 'qualification'
 
+/** Lists the eligibility outcomes. */
+export const ELIGIBILITIES = ['eligible', 'ineligible', 'referral'] as const
+
+/** Lists the effects a ruling can carry. */
+export const QUALIFICATION_EFFECTS = ['restriction', 'referral', 'condition'] as const
+
 /** Lists the eligibility severities most to least severe: `ineligible`, `referral`, `eligible`. */
 export const ELIGIBILITY_PRECEDENCE: readonly Eligibility[] = Object.freeze([
 	'ineligible',

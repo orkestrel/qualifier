@@ -5,7 +5,9 @@ import type {
 	QuantitativeResult,
 	ReasonEventMap,
 	ReasonInterface,
+	ReasonOptions,
 	ReasonResult,
+	ReasonValidationResult,
 	Subject,
 } from '@orkestrel/reason'
 import {
@@ -16,6 +18,7 @@ import {
 } from '@src/core'
 import { isObject } from '@orkestrel/contract'
 import { Emitter } from '@orkestrel/emitter'
+import { createRecorder } from '@orkestrel/test'
 import {
 	createAtom,
 	createFactorGroup,
@@ -27,6 +30,7 @@ import {
 	createTransform,
 	extractAtoms,
 	isLogicalDefinition,
+	Reason,
 } from '@orkestrel/reason'
 
 /** Builds every ordering of a list, so a case can drive an order-independent helper with each. */
@@ -40,9 +44,24 @@ export function buildPermutations<T>(list: readonly T[]): readonly T[][] {
 	})
 }
 
+/** Counts what a real engine is asked to validate. */
+class CountingReason extends Reason {
+	readonly validations = createRecorder<[Definition]>()
+
+	override validate(definition: Definition): ReasonValidationResult {
+		this.validations.handler(definition)
+		return super.validate(definition)
+	}
+}
+
+/** Creates a real engine that counts what it is asked to validate. */
+export function createCountingReason(options: ReasonOptions) {
+	return new CountingReason(options)
+}
+
 /** Builds one `Finding` from the members a case cares about, defaulting the rest. */
 export function buildFinding(
-	overrides: Partial<Finding> & Pick<Finding, 'id' | 'pass' | 'rule' | 'effect' | 'applied'>,
+	overrides: Partial<Finding> & Pick<Finding, 'id' | 'pass' | 'rule' | 'effect' | 'state'>,
 ): Finding {
 	return {
 		premises: [],
@@ -240,6 +259,9 @@ export const FAILING_RESULT: QuantitativeResult = {
 	success: false,
 	trace: ['engine trace'],
 	errors: ['engine boom'],
+	faults: [],
+	repairs: [],
+	defaulted: [],
 }
 
 /** Answers every subject with {@link FAILING_RESULT}, one result per subject reasoned. */
