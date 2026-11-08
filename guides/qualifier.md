@@ -555,7 +555,7 @@ eligible and contributes evidence a later consumer may act on.
 
 ### Publishing definitions and results
 
-`createQualificationDefinitionContract()` publishes a definition, its `schema` for an LLM, a tool, or MCP. Cross a definition on `is`, never `parse`, and hold the result, because building it walks the recursive expressions of its logical passes. `is` reads a nested `shape` as any JSON value and the guard reads it as a shape, so `shape: 42` passes `is` and `isQualificationDefinition` refuses it: a definition crossing a boundary goes through the guard as well. A result crosses as `projectQualificationResult`, which `qualificationResultContract` admits, because a premise's `actual` holds whatever the subject held and a derivation's `value` may be `NaN`.
+`createQualificationDefinitionContract()` publishes a definition, its `schema` for an LLM, a tool, or MCP. Cross a definition on `is`, never `parse`, and hold the result, because building it walks the recursive expressions of its logical passes. The contract validates a nested `shape` through `shapeShape`, so both its `is` method and the `isQualificationDefinition` guard refuse a malformed declaration such as `shape: 42`. A result crosses as `projectQualificationResult`, which `qualificationResultContract` admits, because a premise's `actual` holds whatever the subject held and a derivation's `value` may be `NaN`.
 
 ### Validation
 
