@@ -971,7 +971,7 @@ reasoner.reason({ age: '30.0' }, definition).errors // ['age: type; expected num
 
 A subject with accessors has to read the same every time, because `explain`, `audit`, and `parse` each read it: a getter answering `30` and then `'30.0'` is admitted as `{ age: 30 }` with no repair recorded. Hand the door plain data. The same goes for a definition: `validate` runs once per definition by identity, so one edited in place after its first run is not validated again. Build a new one instead.
 
-The door uses the dependency's admission boundary to refuse undeclared keys, ambiguous unions, truncated audits, and lossy repairs. An object declared open admits extras.
+The door admits through `contract`'s `repairValue` function: it repairs a lossless leaf, such as the number `30` from the string `'30'`, reports the repair in `repairs`, and refuses undeclared keys, ambiguous unions, truncated audits, and lossy repairs. An object declared open admits extras.
 
 A door fault's `path` is `contract`'s array of keys and an engine fault's is the path the rule wrote, so compare them with `formatField`. `parse` gives the subject the reasoner reads. What it coerced is reported in `repairs`, and only a lossless repair is accepted: a number from a string whose trim is the number's own text, so `'30'` and `' 30 '` pass and `'30.0'`, `'007'`, `'0x10'`, and `'1e3'` refuse; a boolean from `'true'` or `'false'` only; a literal from its trimmed text; a string from a finite number. A field declared with `optionalShape(inner, { default })` carries that default in its schema, and `parse` fills it when the key is absent or `undefined`. `defaulted` lists what `parse` filled, read from the difference between what arrived and what came out.
 
